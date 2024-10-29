@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
@@ -13,11 +14,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// RBACReconciler is responsible for reconciling RBAC resources.
 type RBACReconciler struct {
 	client.Client
 	builder *builder.Builder
 }
 
+// NewRBACReconiler creates a new RBACReconciler.
 func NewRBACReconiler(client client.Client, builder *builder.Builder) *RBACReconciler {
 	return &RBACReconciler{
 		Client:  client,
@@ -25,7 +28,8 @@ func NewRBACReconiler(client client.Client, builder *builder.Builder) *RBACRecon
 	}
 }
 
-func (r *RBACReconciler) ReconcileServiceAccount(ctx context.Context, key types.NamespacedName, doltcluster *doltv1alpha.DoltCluster) (*corev1.ServiceAccount, error) {
+// ReconcileServiceAccount ensures that a ServiceAccount exists for the given DoltDB.
+func (r *RBACReconciler) ReconcileServiceAccount(ctx context.Context, key types.NamespacedName, doltdb *doltv1alpha.DoltCluster) (*corev1.ServiceAccount, error) {
 	var existingSA corev1.ServiceAccount
 	err := r.Get(ctx, key, &existingSA)
 	if err == nil {
@@ -35,7 +39,7 @@ func (r *RBACReconciler) ReconcileServiceAccount(ctx context.Context, key types.
 		return nil, fmt.Errorf("error getting ServiceAccount: %v", err)
 	}
 
-	sa, err := r.builder.BuildServiceAccount(key, doltcluster)
+	sa, err := r.builder.BuildServiceAccount(key, doltdb)
 	if err != nil {
 		return nil, fmt.Errorf("error building ServiceAccount: %v", err)
 	}
@@ -45,14 +49,15 @@ func (r *RBACReconciler) ReconcileServiceAccount(ctx context.Context, key types.
 	return sa, nil
 }
 
-func (r *RBACReconciler) ReconcileDoltRBAC(ctx context.Context, doltcluster *doltv1alpha.DoltCluster) error {
-	key := doltcluster.ServiceAccountKey()
-	sa, err := r.ReconcileServiceAccount(ctx, key, doltcluster)
+// ReconcileDoltRBAC ensures that all necessary RBAC resources exist for the given DoltCluster.
+func (r *RBACReconciler) ReconcileDoltRBAC(ctx context.Context, doltdb *doltv1alpha.DoltCluster) error {
+	key := doltdb.ServiceAccountKey()
+	sa, err := r.ReconcileServiceAccount(ctx, key, doltdb)
 	if err != nil {
 		return fmt.Errorf("error reconciling ServiceAccount: %v", err)
 	}
 
-	role, err := r.reconcileRole(ctx, key, doltcluster)
+	role, err := r.reconcileRole(ctx, key, doltdb)
 	if err != nil {
 		return fmt.Errorf("error reconciling Role: %v", err)
 	}
@@ -62,29 +67,28 @@ func (r *RBACReconciler) ReconcileDoltRBAC(ctx context.Context, doltcluster *dol
 		Kind:     "Role",
 		Name:     role.Name,
 	}
-	if err := r.reconcileRoleBinding(ctx, key, doltcluster, sa, roleRef); err != nil {
+	if err := r.reconcileRoleBinding(ctx, key, doltdb, sa, roleRef); err != nil {
 		return fmt.Errorf("error reconciling RoleBinding: %v", err)
 	}
 
-	// if k8sAuth.Enabled {
-	// 	authDelegatorRoleRef := rbacv1.RoleRef{
-	// 		APIGroup: rbacv1.GroupName,
-	// 		Kind:     "ClusterRole",
-	// 		Name:     "system:auth-delegator",
-	// 	}
-	// 	key := types.NamespacedName{
-	// 		Name:      fmt.Sprintf("%s:auth-delegator", k8sAuth.AuthDelegatorRoleNameOrDefault(doltcluster)),
-	// 		Namespace: doltcluster.Namespace,
-	// 	}
-	// 	if err := r.reconcileClusterRoleBinding(ctx, key, mariadb, sa, authDelegatorRoleRef); err != nil {
-	// 		return fmt.Errorf("error reconciling system:auth-delegator ClusterRoleBinding: %v", err)
-	// 	}
-	// }
+	authDelegatorRoleRef := rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
+		Kind:     "ClusterRole",
+		Name:     "system:auth-delegator",
+	}
+	authDelegatorKey := types.NamespacedName{
+		Name:      fmt.Sprintf("%s:auth-delegator", authDelegatorRoleNameOrDefault(doltdb)),
+		Namespace: doltdb.Namespace,
+	}
+	if err := r.reconcileClusterRoleBinding(ctx, authDelegatorKey, doltdb, sa, authDelegatorRoleRef); err != nil {
+		return fmt.Errorf("error reconciling system:auth-delegator ClusterRoleBinding: %v", err)
+	}
+
 	return nil
 }
 
-func (r *RBACReconciler) reconcileRole(ctx context.Context, key types.NamespacedName,
-	doltcluster *doltv1alpha.DoltCluster) (*rbacv1.Role, error) {
+// reconcileRole ensures that a Role exists for the given DoltCluster.
+func (r *RBACReconciler) reconcileRole(ctx context.Context, key types.NamespacedName, doltdb *doltv1alpha.DoltCluster) (*rbacv1.Role, error) {
 	var existingRole rbacv1.Role
 	err := r.Get(ctx, key, &existingRole)
 	if err == nil {
@@ -95,31 +99,31 @@ func (r *RBACReconciler) reconcileRole(ctx context.Context, key types.Namespaced
 	}
 
 	rules := []rbacv1.PolicyRule{
-		// {
-		// 	APIGroups: []string{
-		// 		doltcluster.
-		// 	},
-		// 	Resources: []string{
-		// 		"mariadbs",
-		// 	},
-		// 	Verbs: []string{
-		// 		"get",
-		// 	},
-		// },
-		// {
-		// 	APIGroups: []string{
-		// 		corev1.GroupName,
-		// 	},
-		// 	Resources: []string{
-		// 		"pods",
-		// 	},
-		// 	Verbs: []string{
-		// 		"get",
-		// 	},
-		// },
+		{
+			APIGroups: []string{
+				doltv1alpha.GroupVersion.Group,
+			},
+			Resources: []string{
+				"doltclusters",
+			},
+			Verbs: []string{
+				"get",
+			},
+		},
+		{
+			APIGroups: []string{
+				corev1.GroupName,
+			},
+			Resources: []string{
+				"pods",
+			},
+			Verbs: []string{
+				"get",
+			},
+		},
 	}
 
-	role, err := r.builder.BuildRole(key, doltcluster, rules)
+	role, err := r.builder.BuildRole(key, doltdb, rules)
 	if err != nil {
 		return nil, fmt.Errorf("error building Role: %v", err)
 	}
@@ -129,8 +133,8 @@ func (r *RBACReconciler) reconcileRole(ctx context.Context, key types.Namespaced
 	return role, nil
 }
 
-func (r *RBACReconciler) reconcileRoleBinding(ctx context.Context, key types.NamespacedName, doltcluster *doltv1alpha.DoltCluster,
-	sa *corev1.ServiceAccount, roleRef rbacv1.RoleRef) error {
+// reconcileRoleBinding ensures that a RoleBinding exists for the given DoltCluster.
+func (r *RBACReconciler) reconcileRoleBinding(ctx context.Context, key types.NamespacedName, doltdb *doltv1alpha.DoltCluster, sa *corev1.ServiceAccount, roleRef rbacv1.RoleRef) error {
 	var existingRB rbacv1.RoleBinding
 	err := r.Get(ctx, key, &existingRB)
 	if err == nil {
@@ -140,7 +144,7 @@ func (r *RBACReconciler) reconcileRoleBinding(ctx context.Context, key types.Nam
 		return fmt.Errorf("error getting RoleBinding: %v", err)
 	}
 
-	rb, err := r.builder.BuildRoleBinding(key, doltcluster, sa, roleRef)
+	rb, err := r.builder.BuildRoleBinding(key, doltdb, sa, roleRef)
 	if err != nil {
 		return fmt.Errorf("error building RoleBinding: %v", err)
 	}
@@ -150,14 +154,14 @@ func (r *RBACReconciler) reconcileRoleBinding(ctx context.Context, key types.Nam
 	return nil
 }
 
-func (r *RBACReconciler) reconcileClusterRoleBinding(ctx context.Context, key types.NamespacedName, doltcluster *doltv1alpha.DoltCluster,
-	sa *corev1.ServiceAccount, roleRef rbacv1.RoleRef) error {
+// reconcileClusterRoleBinding ensures that a ClusterRoleBinding exists for the given DoltCluster.
+func (r *RBACReconciler) reconcileClusterRoleBinding(ctx context.Context, key types.NamespacedName, doltdb *doltv1alpha.DoltCluster, sa *corev1.ServiceAccount, roleRef rbacv1.RoleRef) error {
 	var existingCRB rbacv1.ClusterRoleBinding
 	err := r.Get(ctx, key, &existingCRB)
 	if err == nil {
-		if !isOwnedBy(doltcluster, &existingCRB) {
+		if !isOwnedBy(doltdb, &existingCRB) {
 			return fmt.Errorf(
-				"ClusterRoleBinding '%s' already exists.",
+				"ClusterRoleBinding '%s' already exists",
 				existingCRB.Name,
 			)
 		}
@@ -167,7 +171,7 @@ func (r *RBACReconciler) reconcileClusterRoleBinding(ctx context.Context, key ty
 		return fmt.Errorf("error getting ClusterRoleBinding: %v", err)
 	}
 
-	crdb, err := r.builder.BuildClusterRoleBinding(key, doltcluster, sa, roleRef)
+	crdb, err := r.builder.BuildClusterRoleBinding(key, doltdb, sa, roleRef)
 	if err != nil {
 		return fmt.Errorf("error building ClusterRoleBinding: %v", err)
 	}
@@ -177,6 +181,7 @@ func (r *RBACReconciler) reconcileClusterRoleBinding(ctx context.Context, key ty
 	return nil
 }
 
+// isOwnedBy checks if the child object is owned by the owner object.
 func isOwnedBy(owner client.Object, child client.Object) bool {
 	ownerReferences := child.GetOwnerReferences()
 	for _, ownerRef := range ownerReferences {
@@ -185,4 +190,15 @@ func isOwnedBy(owner client.Object, child client.Object) bool {
 		}
 	}
 	return false
+}
+
+// authDelegatorRoleNameOrDefault defines the ClusterRoleBinding name bound to system:auth-delegator.
+// It falls back to the DoltCluster name if AuthDelegatorRoleName is not set.
+func authDelegatorRoleNameOrDefault(doltdb *doltv1alpha.DoltCluster) string {
+	name := fmt.Sprintf("%s-%s", doltdb.Name, doltdb.Namespace)
+	parts := strings.Split(string(doltdb.UID), "-")
+	if len(parts) > 0 {
+		name += fmt.Sprintf("-%s", parts[0])
+	}
+	return name
 }
