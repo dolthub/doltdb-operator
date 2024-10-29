@@ -19,29 +19,47 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
+	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
+	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
+	"github.com/electronicarts/doltdb-operator/pkg/conditions"
 	"github.com/electronicarts/doltdb-operator/pkg/controller"
-	"github.com/electronicarts/doltdb-operator/pkg/dolt/config"
+	"github.com/electronicarts/doltdb-operator/pkg/controller/replication"
+	"github.com/electronicarts/doltdb-operator/pkg/dolt"
+	doltpod "github.com/electronicarts/doltdb-operator/pkg/pod"
+	"github.com/electronicarts/doltdb-operator/pkg/refresolver"
+	"github.com/electronicarts/doltdb-operator/pkg/statefulset"
+	appsv1 "k8s.io/api/apps/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8sctrl "sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
-// DoltClusterReconciler reconciles a DoltCluster object
-type DoltClusterReconciler struct {
+// DoltDBReconciler reconciles a DoltCluster object
+type DoltDBReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	builder *builder.Builder
+	Builder        *builder.Builder
+	ConditionReady *conditions.Ready
+	RefResolver    *refresolver.RefResolver
 
-	configMapReconciler *controller.ConfigMapReconciler
-	serviceReconciler   *controller.ServiceReconciler
+	RBACReconciler        *controller.RBACReconciler
+	ConfigMapReconciler   *controller.ConfigMapReconciler
+	ServiceReconciler     *controller.ServiceReconciler
+	StatefulSetReconciler *controller.StatefulSetReconciler
+	ReplicationReconciler *replication.ReplicationReconciler
 }
 
 type reconcilePhaseDoltCluster struct {
@@ -69,7 +87,7 @@ type reconcilePhaseDoltCluster struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *DoltClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DoltDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
 	// Fetch DoltCluster CRD in current namespace
@@ -81,120 +99,255 @@ func (r *DoltClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	phases := []reconcilePhaseDoltCluster{
 		{
+			Name:      "Status",
+			Reconcile: r.reconcileStatus,
+		},
+		{
 			Name:      "ConfigMap",
 			Reconcile: r.reconcileConfigMap,
+		},
+		{
+			Name:      "RBAC",
+			Reconcile: r.reconcileRBAC,
+		},
+		{
+			Name:      "Storage",
+			Reconcile: r.reconcileStorage,
+		},
+		{
+			Name:      "StatefulSet",
+			Reconcile: r.reconcileStatefulSet,
+		},
+		{
+			Name:      "PodDisruptionBudget",
+			Reconcile: r.reconcilePodDisruptionBudget,
 		},
 		{
 			Name:      "Service",
 			Reconcile: r.reconcileService,
 		},
-		// {
-		// 	Name:      "StatefulSet",
-		// 	Reconcile: r.reconcileStatefulSet,
-		// },
+		{
+			Name:      "Replication",
+			Reconcile: r.ReplicationReconciler.Reconcile,
+		},
+		{
+			Name:      "Labels",
+			Reconcile: r.reconcilePodLabels,
+		},
 	}
+	for _, p := range phases {
+		result, err := p.Reconcile(ctx, &doltCluster)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 
-	// Fetch DoltCluster StatefulSets
-	var statefulSet appsv1.StatefulSet
-	if err := r.Get(ctx, req.NamespacedName, &statefulSet); err != nil {
-		log.Error(err, "unable to find StatefulSets")
-		return ctrl.Result{}, err
+			var errBundle *multierror.Error
+			errBundle = multierror.Append(errBundle, err)
+
+			msg := fmt.Sprintf("Error reconciling %s: %v", p.Name, err)
+			patchErr := r.patchStatus(ctx, &doltCluster, func(s *doltv1alpha.DoltClusterStatus) error {
+				patcher := r.ConditionReady.PatcherFailed(msg)
+				patcher(s)
+				return nil
+			})
+			if !apierrors.IsNotFound(patchErr) {
+				errBundle = multierror.Append(errBundle, patchErr)
+			}
+
+			if err := errBundle.ErrorOrNil(); err != nil {
+				return ctrl.Result{}, fmt.Errorf("error reconciling %s: %v", p.Name, err)
+			}
+		}
+		if !result.IsZero() {
+			return result, err
+		}
 	}
-
-	// Fetch all pods in part of statefulset
-	var pods corev1.PodList
-	if err := r.List(ctx, &pods, client.InNamespace(req.Namespace), client.MatchingFields{"managedBy": req.Name}); err != nil {
-		log.Error(err, "unable to list pods")
-		return ctrl.Result{}, err
-	}
-
-	// Find primary and replicas
-	// Check status
-	// Primary failed? Promote replica
-	// Replica failed? Perform a rollout restart replica
-
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *DoltClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+func (r *DoltDBReconciler) SetupWithManager(mgr ctrl.Manager, opts k8sctrl.Options) error {
+	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&doltv1alpha.DoltCluster{}).
-		Complete(r)
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.Event{}).
+		Owns(&corev1.ServiceAccount{}).
+		Owns(&appsv1.StatefulSet{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&policyv1.PodDisruptionBudget{}).
+		Owns(&rbacv1.Role{}).
+		Owns(&rbacv1.RoleBinding{}).
+		WithOptions(opts)
+
+	// TODO: Add watchers for indexes
+
+	return builder.Complete(r)
 }
 
-func (r *DoltClusterReconciler) reconcileConfigMap(ctx context.Context, doltcluster *doltv1alpha.DoltCluster) (ctrl.Result, error) {
-	defaultConfigMapKeyRef := doltcluster.DefaultConfigMapKey()
+func (r *DoltDBReconciler) reconcileConfigMap(ctx context.Context, doltdb *doltv1alpha.DoltCluster) (ctrl.Result, error) {
+	defaultConfigMapKeyRef := doltdb.DefaultConfigMapKey()
 
-	config := config.GenerateConfigMapData(doltcluster)
+	config, err := dolt.GenerateConfigMapData(doltdb)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("error generating DoltDB ConfigMap data: %v", err)
+	}
 
 	req := controller.ConfigMapReconcileRequest{
-		Metadata: doltcluster,
-		Owner:    doltcluster,
+		Metadata: &doltdb.ObjectMeta,
+		Owner:    doltdb,
 		Key:      defaultConfigMapKeyRef,
 		Data:     config,
 	}
-	if err := r.configMapReconciler.Reconcile(ctx, &req); err != nil {
+	if err := r.ConfigMapReconciler.Reconcile(ctx, &req); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *DoltClusterReconciler) reconcileService(ctx context.Context, doltcluster *doltv1alpha.DoltCluster) (ctrl.Result, error) {
-	if err := r.reconcileInternalService(ctx, doltcluster); err != nil {
+func (r *DoltDBReconciler) reconcileService(ctx context.Context, doltdb *doltv1alpha.DoltCluster) (ctrl.Result, error) {
+	if err := r.reconcileInternalService(ctx, doltdb); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error reconciling internal Service: %v", err)
 	}
-	if err := r.reconcilePrimarylService(ctx, doltcluster); err != nil {
+
+	// if doltdb.Replication().Enabled {
+	if err := r.reconcilePrimarylService(ctx, doltdb); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error reconciling primary Service: %v", err)
 	}
-	if err := r.reconcileReaderService(ctx, doltcluster); err != nil {
+	if err := r.reconcileReaderService(ctx, doltdb); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error reconciling reader Service: %v", err)
 	}
+	// }
 	return ctrl.Result{}, nil
 }
 
-func (r *DoltClusterReconciler) reconcileInternalService(ctx context.Context, doltcluster *doltv1alpha.DoltCluster) error {
-	internalHeadlessSvc, err := r.builder.BuildDoltInternalService(doltcluster)
+func (r *DoltDBReconciler) reconcileInternalService(ctx context.Context, doltdb *doltv1alpha.DoltCluster) error {
+	internalHeadlessSvc, err := r.Builder.BuildDoltInternalService(doltdb)
 	if err != nil {
 		return fmt.Errorf("error building internal Service: %v", err)
 	}
 
-	return r.serviceReconciler.Reconcile(ctx, internalHeadlessSvc)
+	return r.ServiceReconciler.Reconcile(ctx, internalHeadlessSvc)
 }
 
-func (r *DoltClusterReconciler) reconcilePrimarylService(ctx context.Context, doltcluster *doltv1alpha.DoltCluster) error {
-	primarySvc, err := r.builder.BuildDoltPrimaryService(doltcluster)
+func (r *DoltDBReconciler) reconcilePrimarylService(ctx context.Context, doltdb *doltv1alpha.DoltCluster) error {
+	primarySvc, err := r.Builder.BuildDoltPrimaryService(doltdb)
 	if err != nil {
 		return fmt.Errorf("error building primary Service: %v", err)
 	}
 
-	return r.serviceReconciler.Reconcile(ctx, primarySvc)
+	return r.ServiceReconciler.Reconcile(ctx, primarySvc)
 }
 
-func (r *DoltClusterReconciler) reconcileReaderService(ctx context.Context, doltcluster *doltv1alpha.DoltCluster) error {
-	primarySvc, err := r.builder.BuildDoltReaderService(doltcluster)
+func (r *DoltDBReconciler) reconcileReaderService(ctx context.Context, doltdb *doltv1alpha.DoltCluster) error {
+	primarySvc, err := r.Builder.BuildDoltReaderService(doltdb)
 	if err != nil {
 		return fmt.Errorf("error building reader Service: %v", err)
 	}
 
-	return r.serviceReconciler.Reconcile(ctx, primarySvc)
+	return r.ServiceReconciler.Reconcile(ctx, primarySvc)
 }
 
-func (r *DoltClusterReconciler) reconcileStatefulSet(ctx context.Context, doltcluster *doltv1alpha.DoltCluster) (ctrl.Result, error) {
-	key := client.ObjectKeyFromObject(doltcluster)
+func (r *DoltDBReconciler) reconcileStatefulSet(ctx context.Context, doltdb *doltv1alpha.DoltCluster) (ctrl.Result, error) {
+	key := client.ObjectKeyFromObject(doltdb)
 
-	desiredSts, err := r.builder.BuildDoltStatefulSet(key, doltcluster)
+	desiredSts, err := r.Builder.BuildDoltStatefulSet(key, doltdb)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("error building StatefulSet: %v", err)
 	}
 
-	if err := r.StatefulSetReconciler.ReconcileWithUpdates(ctx, desiredSts, shouldUpdate); err != nil {
+	if err := r.StatefulSetReconciler.ReconcileWithUpdates(ctx, desiredSts); err != nil {
 		return ctrl.Result{}, fmt.Errorf("error reconciling StatefulSet: %v", err)
 	}
 
-	if result, err := r.reconcileUpdates(ctx, doltcluster); !result.IsZero() || err != nil {
+	if result, err := r.reconcileUpdates(ctx, doltdb); !result.IsZero() || err != nil {
 		return result, err
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *DoltDBReconciler) reconcilePodLabels(ctx context.Context, doltdb *doltv1alpha.DoltCluster) (ctrl.Result, error) {
+	if doltdb.Status.CurrentPrimaryPodIndex == nil {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	podList := corev1.PodList{}
+	listOpts := &client.ListOptions{
+		LabelSelector: klabels.SelectorFromSet(
+			builder.NewLabelsBuilder().
+				WithDoltSelectorLabels(doltdb).
+				Build(),
+		),
+		Namespace: doltdb.GetNamespace(),
+	}
+	if err := r.List(ctx, &podList, listOpts); err != nil {
+		return ctrl.Result{}, fmt.Errorf("error listing Pods: %v", err)
+	}
+
+	for _, pod := range podList.Items {
+		podLabels := builder.NewLabelsBuilder().WithLabels(pod.Labels)
+
+		if pod.Status.PodIP == "" || pod.Spec.NodeName == "" {
+			continue
+		}
+		podIndex, err := statefulset.PodIndex(pod.Name)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("error getting Pod '%s' index: %v", pod.Name, err)
+		}
+
+		if *podIndex == *doltdb.Status.CurrentPrimaryPodIndex {
+			pod.Labels = podLabels.WithPodPrimaryRole().Build()
+		} else {
+			pod.Labels = podLabels.WithPodStandbyRole().Build()
+		}
+
+		p := client.MergeFrom(pod.DeepCopy())
+
+		if doltpod.PodReady(&pod) {
+			if err := r.Patch(ctx, &pod, p); err != nil {
+				if apierrors.IsConflict(err) {
+					return ctrl.Result{Requeue: true}, nil
+				}
+				if apierrors.IsNotFound(err) {
+					return ctrl.Result{Requeue: true}, nil
+				}
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *DoltDBReconciler) reconcileRBAC(ctx context.Context, doltdb *doltv1alpha.DoltCluster) (ctrl.Result, error) {
+	return ctrl.Result{}, r.RBACReconciler.ReconcileDoltRBAC(ctx, doltdb)
+}
+
+func (r *DoltDBReconciler) reconcilePodDisruptionBudget(ctx context.Context, doltdb *doltv1alpha.DoltCluster) (ctrl.Result, error) {
+	key := doltdb.PodDisruptionBudgetKey()
+
+	var existingPDB policyv1.PodDisruptionBudget
+	if err := r.Get(ctx, key, &existingPDB); err == nil {
+		return ctrl.Result{}, nil
+	}
+
+	selectorLabels :=
+		builder.NewLabelsBuilder().
+			WithDoltSelectorLabels(doltdb).
+			Build()
+	minAvailable := intstr.FromString("50%")
+	opts := builder.PodDisruptionBudgetOpts{
+		Metadata:       &doltdb.ObjectMeta,
+		Key:            key,
+		MinAvailable:   &minAvailable,
+		SelectorLabels: selectorLabels,
+	}
+	pdb, err := r.Builder.BuildPodDisruptionBudget(opts, doltdb)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("error building PodDisruptionBudget: %v", err)
+	}
+
+	return ctrl.Result{}, r.Create(ctx, pdb)
 }
