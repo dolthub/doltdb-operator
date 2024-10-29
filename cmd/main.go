@@ -30,6 +30,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -38,6 +39,13 @@ import (
 
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/internal/controller"
+	"github.com/electronicarts/doltdb-operator/pkg/builder"
+	"github.com/electronicarts/doltdb-operator/pkg/conditions"
+	pkgctrl "github.com/electronicarts/doltdb-operator/pkg/controller"
+	"github.com/electronicarts/doltdb-operator/pkg/controller/replication"
+	"github.com/electronicarts/doltdb-operator/pkg/dolt"
+	"github.com/electronicarts/doltdb-operator/pkg/refresolver"
+	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -60,6 +68,8 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	var maxConcurrentReconciles int
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -70,6 +80,9 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 1,
+		"Global maximum number of concurrent reconciles per resource.")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -137,31 +150,81 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "f807412f.REDACTED",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
+		LeaderElectionID:       "k8s.dolthub.com",
+		Controller: config.Controller{
+			MaxConcurrentReconciles: maxConcurrentReconciles,
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controller.DoltClusterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DoltCluster")
+	client := mgr.GetClient()
+	scheme := mgr.GetScheme()
+	replRecorder := mgr.GetEventRecorderFor("replication")
+
+	conditionReady := conditions.NewReady()
+	builder := builder.NewBuilder(scheme)
+	refResolver := refresolver.New(client)
+
+	// controllers
+	rbacReconciler := pkgctrl.NewRBACReconiler(client, builder)
+	configMapReconciler := pkgctrl.NewConfigMapReconciler(client, builder)
+	serviceReconciler := pkgctrl.NewServiceReconciler(client)
+	statefulSetReconciler := pkgctrl.NewStatefulSetReconciler(client)
+	replConfig := replication.NewReplicationConfig(client, builder)
+	replicationReconciler, err := replication.NewReplicationReconciler(
+		client,
+		replRecorder,
+		builder,
+		replConfig,
+		replication.WithRefResolver(refResolver),
+		replication.WithServiceReconciler(serviceReconciler),
+	)
+	if err != nil {
+		setupLog.Error(err, "Error creating Replication reconciler")
 		os.Exit(1)
 	}
+
+	podReplicationController := controller.NewPodController(
+		"pod-replication",
+		client,
+		refResolver,
+		replication.NewPodReadinessController(
+			client,
+			replRecorder,
+			builder,
+			refResolver,
+			replConfig,
+		),
+		[]string{
+			dolt.Annotation,
+			dolt.ReplicationAnnotation,
+		},
+	)
+
+	if err = (&controller.DoltDBReconciler{
+		Client:                client,
+		Scheme:                scheme,
+		Builder:               builder,
+		ConditionReady:        conditionReady,
+		RefResolver:           refResolver,
+		RBACReconciler:        rbacReconciler,
+		ConfigMapReconciler:   configMapReconciler,
+		ServiceReconciler:     serviceReconciler,
+		StatefulSetReconciler: statefulSetReconciler,
+		ReplicationReconciler: replicationReconciler,
+	}).SetupWithManager(mgr, ctrlcontroller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DoltDB")
+		os.Exit(1)
+	}
+
+	if err = podReplicationController.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Unable to create controller", "controller", "PodReplication")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
