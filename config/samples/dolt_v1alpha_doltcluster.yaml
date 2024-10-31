@@ -1,9 +1,16 @@
 apiVersion: k8s.dolthub.com/v1alpha
 kind: DoltCluster
 metadata:
-  labels:
-    app.kubernetes.io/name: dolt-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: doltcluster-sample
+  name: dolt
+  namespace: default
 spec:
-  # TODO(user): Add fields here
+  engineVersion: 1.7.6
+  image: "dolthub/dolt"
+  replicas: 3
+  storage:
+    size: "100Gi"
+  replication:
+    enabled: true
+    primary: 
+      podIndex: 0
+      automaticFailover: true
