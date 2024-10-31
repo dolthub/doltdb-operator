@@ -9,6 +9,7 @@ import (
 	"github.com/electronicarts/doltdb-operator/pkg/conditions"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/replication"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
+	"github.com/electronicarts/doltdb-operator/pkg/health"
 	podpkg "github.com/electronicarts/doltdb-operator/pkg/pod"
 	"github.com/electronicarts/doltdb-operator/pkg/statefulset"
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,14 +29,20 @@ func (r *DoltDBReconciler) reconcileStatus(ctx context.Context, doltdb *doltv1al
 		log.FromContext(ctx).V(1).Info("error getting StatefulSet", "err", err)
 	}
 
-	replicationStatus, replErr := r.getReplicationStatus(ctx, doltdb)
-	if replErr != nil {
-		log.FromContext(ctx).V(1).Info("error getting replication status", "err", replErr)
-	}
+	clientSet := replication.NewReplicationClientSet(doltdb, r.RefResolver)
+	defer clientSet.Close()
+
+	dbstates := r.ReplicationReconciler.GetDBStates(ctx, doltdb, clientSet)
+
+	replicationStatus, highestEpoch := r.getReplicationStatusAndEpoch(ctx, doltdb, dbstates)
 
 	return ctrl.Result{}, r.patchStatus(ctx, doltdb, func(status *doltv1alpha.DoltClusterStatus) error {
 		status.Replicas = sts.Status.ReadyReplicas
 		defaultPrimary(doltdb)
+
+		if highestEpoch != -1 {
+			doltdb.Status.UpdateReplicationEpoch(doltdb, highestEpoch)
+		}
 
 		if replicationStatus != nil {
 			status.ReplicationStatus = replicationStatus
@@ -114,44 +121,55 @@ func (r *DoltDBReconciler) setUpdatedCondition(ctx context.Context, doltdb *dolt
 	return nil
 }
 
-func (r *DoltDBReconciler) getReplicationStatus(ctx context.Context,
-	doltdb *doltv1alpha.DoltCluster) (doltv1alpha.ReplicationStatus, error) {
+func (r *DoltDBReconciler) getReplicationStatusAndEpoch(ctx context.Context,
+	doltdb *doltv1alpha.DoltCluster, dbstates []dolt.DBState) (doltv1alpha.ReplicationStatus, int) {
 	if !doltdb.Replication().Enabled {
-		return nil, nil
+		return nil, -1
 	}
 
-	clientSet, err := replication.NewReplicationClientSet(doltdb, r.RefResolver)
-	if err != nil {
-		return nil, fmt.Errorf("error creating DoltCluster clientset: %v", err)
-	}
-	defer clientSet.Close()
+	highestEpoch := -1
 
 	replicationStatus := make(doltv1alpha.ReplicationStatus)
 	logger := log.FromContext(ctx)
 	for i := 0; i < int(doltdb.Spec.Replicas); i++ {
-		pod := statefulset.PodName(doltdb.ObjectMeta, i)
+		dbstate := dbstates[i]
+		podName := statefulset.PodName(doltdb.ObjectMeta, i)
 
-		client, err := clientSet.ClientForIndex(ctx, i)
-		if err != nil {
-			logger.V(1).Info("error getting client for Pod", "err", err, "pod", pod)
-			continue
+		if dbstate.Err != nil {
+			logger.V(1).Info("error getting DB state to obtain replication state", "pod", podName, "err", dbstate.Err.Error())
+			if dbstate.Role == "" || dbstate.Epoch == 0 {
+				continue
+			}
 		}
 
-		role, _, err := client.GetRoleAndEpoch(ctx)
+		if dbstate.Epoch > highestEpoch && dbstate.Epoch > ptr.Deref(doltdb.Status.ReplicationEpoch, 0) {
+			highestEpoch = dbstate.Epoch
+		}
+
+		_, healthy, err := health.IsDoltDBReplicaHealthy(ctx, r.Client, doltdb, i)
 		if err != nil {
-			logger.V(1).Info("error checking Pod replication state", "err", err, "pod", pod)
+			logger.V(1).Info("error getting replica readiness", "pod", podName, "err", err.Error())
+			continue
+		}
+		if !healthy {
 			continue
 		}
 
 		state := doltv1alpha.ReplicationStateNotConfigured
-		if role == dolt.PrimaryRoleValue.String() {
+
+		if dbstate.Role == dolt.PrimaryRoleValue.String() {
+			// If there's more than one primary, we need to reconcile, marking pod replication status as broken
+			if doltdb.Status.CurrentPrimary != nil && *doltdb.Status.CurrentPrimary != podName {
+				continue
+			}
 			state = doltv1alpha.ReplicationStatePrimary
-		} else if role == dolt.StandbyRoleValue.String() {
+		} else if dbstate.Role == dolt.StandbyRoleValue.String() {
 			state = doltv1alpha.ReplicationStateStandby
 		}
-		replicationStatus[pod] = state
+		replicationStatus[podName] = state
 	}
-	return replicationStatus, nil
+
+	return replicationStatus, highestEpoch
 }
 
 func defaultPrimary(doltdb *doltv1alpha.DoltCluster) {

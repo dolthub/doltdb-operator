@@ -270,7 +270,7 @@ func (r *DoltDBReconciler) reconcileStatefulSet(ctx context.Context, doltdb *dol
 
 func (r *DoltDBReconciler) reconcilePodLabels(ctx context.Context, doltdb *doltv1alpha.DoltCluster) (ctrl.Result, error) {
 	if doltdb.Status.CurrentPrimaryPodIndex == nil {
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	podList := corev1.PodList{}
@@ -296,6 +296,8 @@ func (r *DoltDBReconciler) reconcilePodLabels(ctx context.Context, doltdb *doltv
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("error getting Pod '%s' index: %v", pod.Name, err)
 		}
+
+		podLabels.WithStatefulSetPod(doltdb, *podIndex)
 
 		if *podIndex == *doltdb.Status.CurrentPrimaryPodIndex {
 			pod.Labels = podLabels.WithPodPrimaryRole().Build()

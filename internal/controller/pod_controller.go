@@ -49,7 +49,9 @@ func (r *PodController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	doltCluster, err := r.refResolver.DoltDBFromAnnotation(ctx, pod.ObjectMeta)
+	log.FromContext(ctx).Info("Reconciling Pod", "pod", pod.Name)
+
+	doltdb, err := r.refResolver.DoltDBFromAnnotation(ctx, pod.ObjectMeta)
 	if err != nil {
 		if errors.Is(err, refresolver.ErrDoltClusterAnnotationNotFound) {
 			return ctrl.Result{}, nil
@@ -58,7 +60,7 @@ func (r *PodController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	if !doltpod.PodReady(&pod) {
-		if err := r.failoverController.ReconcilePodNotReady(ctx, pod, doltCluster); err != nil {
+		if err := r.failoverController.ReconcilePodNotReady(ctx, pod, doltdb); err != nil {
 			log.FromContext(ctx).V(1).Info("Error reconciling Pod in non Ready state", "pod", pod.Name)
 			return ctrl.Result{Requeue: true}, nil
 		}

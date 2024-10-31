@@ -8,22 +8,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-const (
-	DoltHeadlessService = "dolt-internal"
-	DoltPrimaryService  = "dolt"
-	DoltReaderService   = "dolt-ro"
-)
-
 // doltServicePorts returns the service ports for the Dolt cluster.
 func doltServicePorts() []v1.ServicePort {
 	return []v1.ServicePort{
 		{
 			Port: DoltMySQLPort,
 			Name: DoltMySQLPortName,
-		},
-		{
-			Port: 50051,
-			Name: "grpc",
 		},
 	}
 }

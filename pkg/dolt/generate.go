@@ -8,21 +8,21 @@ import (
 )
 
 // GenerateConfigMapData generates the configuration data for the ConfigMap based on the number of replicas.
-func GenerateConfigMapData(doltCluster *doltv1alpha.DoltCluster) (map[string]string, error) {
+func GenerateConfigMapData(doltdb *doltv1alpha.DoltCluster) (map[string]string, error) {
 	var maxConnections int32
 
-	if doltCluster.Spec.MaxConnections != nil {
-		maxConnections = *doltCluster.Spec.MaxConnections
+	if doltdb.Spec.MaxConnections != nil {
+		maxConnections = *doltdb.Spec.MaxConnections
 	} else {
 		maxConnections = MaxConnections
 	}
 
 	data := make(map[string]string)
-	for i := 0; i < int(doltCluster.Spec.Replicas); i++ {
+	for i := 0; i < int(doltdb.Spec.Replicas); i++ {
 		config := Config{
 			LogLevel: LogLevel,
 			Cluster: Cluster{
-				StandbyRemotes: generateStandbyRemotes(i, doltCluster),
+				StandbyRemotes: generateStandbyRemotes(i, doltdb),
 				BootstrapEpoch: 1,
 				BootstrapRole:  getBootstrapRole(i),
 			},
@@ -39,19 +39,19 @@ func GenerateConfigMapData(doltCluster *doltv1alpha.DoltCluster) (map[string]str
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling DoltDB config to YAML: %v", err)
 		}
-		data[fmt.Sprintf("%s-%d.yaml", doltCluster.Name, i)] = string(yamlData)
+		data[fmt.Sprintf("%s-%d.yaml", doltdb.Name, i)] = string(yamlData)
 	}
 	return data, nil
 }
 
 // generateStandbyRemotes generates the standby remotes section of the configuration.
-func generateStandbyRemotes(current int, doltCluster *doltv1alpha.DoltCluster) []StandbyRemote {
+func generateStandbyRemotes(current int, doltdb *doltv1alpha.DoltCluster) []StandbyRemote {
 	var remotes []StandbyRemote
-	for i := 0; i < int(doltCluster.Spec.Replicas); i++ {
+	for i := 0; i < int(doltdb.Spec.Replicas); i++ {
 		if i != current {
 			remotes = append(remotes, StandbyRemote{
-				Name:              fmt.Sprintf("%s-%d", doltCluster.Name, i),
-				RemoteURLTemplate: fmt.Sprintf("http://%s-%d.%s:%d/{database}", doltCluster.Name, i, doltCluster.InternalServiceKey().Name, RemotesAPIPort),
+				Name:              fmt.Sprintf("%s-%d", doltdb.Name, i),
+				RemoteURLTemplate: fmt.Sprintf("http://%s-%d.%s.%s:%d/{database}", doltdb.Name, i, doltdb.InternalServiceKey().Name, doltdb.Namespace, RemotesAPIPort),
 			})
 		}
 	}

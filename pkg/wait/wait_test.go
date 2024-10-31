@@ -31,7 +31,7 @@ func TestPollWithDoltCluster(t *testing.T) {
 	doltdbKey := types.NamespacedName{Name: "test", Namespace: "default"}
 
 	t.Run("success", func(t *testing.T) {
-		err := PollWithDoltCluster(ctx, doltdbKey, client, logger, func(ctx context.Context) error {
+		err := PollWithDoltDB(ctx, doltdbKey, client, logger, func(ctx context.Context) error {
 			return nil
 		})
 		if err != nil {
@@ -40,7 +40,7 @@ func TestPollWithDoltCluster(t *testing.T) {
 	})
 
 	t.Run("doltcluster not found", func(t *testing.T) {
-		err := PollWithDoltCluster(ctx, types.NamespacedName{Namespace: "default", Name: "another-unknown-doltdb"}, client, logger, func(ctx context.Context) error {
+		err := PollWithDoltDB(ctx, types.NamespacedName{Namespace: "default", Name: "another-unknown-doltdb"}, client, logger, func(ctx context.Context) error {
 			return nil
 		})
 		if err != nil {
@@ -49,7 +49,7 @@ func TestPollWithDoltCluster(t *testing.T) {
 	})
 
 	t.Run("doltcluster get error", func(t *testing.T) {
-		err := PollWithDoltCluster(ctx, doltdbKey, client, logger, func(ctx context.Context) error {
+		err := PollWithDoltDB(ctx, doltdbKey, client, logger, func(ctx context.Context) error {
 			return errors.New("unexpected error")
 		})
 		if err == nil {

@@ -77,16 +77,15 @@ func (r *ReplicationReconciler) Reconcile(ctx context.Context, doltdb *doltv1alp
 	logger := log.FromContext(ctx).WithName("replication")
 	switchoverLogger := log.FromContext(ctx).WithName("switchover")
 
+	doltdbKey := client.ObjectKeyFromObject(doltdb)
+
 	if doltdb.IsSwitchingPrimary() {
-		clientSet, err := NewReplicationClientSet(doltdb, r.refResolver)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("error creating DoltDB clientset: %v", err)
-		}
+		clientSet := NewReplicationClientSet(doltdb, r.refResolver)
 		defer clientSet.close()
 
 		req := reconcileRequest{
 			doltdb:    doltdb,
-			key:       client.ObjectKeyFromObject(doltdb),
+			key:       doltdbKey,
 			clientSet: clientSet,
 		}
 		return ctrl.Result{}, r.reconcileSwitchover(ctx, &req, switchoverLogger)
@@ -95,7 +94,8 @@ func (r *ReplicationReconciler) Reconcile(ctx context.Context, doltdb *doltv1alp
 	healthy, err := health.IsStatefulSetHealthy(
 		ctx,
 		r.Client,
-		client.ObjectKeyFromObject(doltdb),
+		doltdbKey,
+		doltdb.InternalServiceKey(),
 		health.WithDesiredReplicas(doltdb.Spec.Replicas),
 		health.WithPort(dolt.DatabasePort),
 		health.WithEndpointPolicy(health.EndpointPolicyAll),
@@ -107,10 +107,7 @@ func (r *ReplicationReconciler) Reconcile(ctx context.Context, doltdb *doltv1alp
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	clientSet, err := NewReplicationClientSet(doltdb, r.refResolver)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("error creating DoltDB clientset: %v", err)
-	}
+	clientSet := NewReplicationClientSet(doltdb, r.refResolver)
 	defer clientSet.close()
 
 	req := reconcileRequest{
@@ -153,6 +150,7 @@ func (r *ReplicationReconciler) reconcileReplication(ctx context.Context, req *r
 	return ctrl.Result{}, nil
 }
 
+// TODO: reconcile if two primaries, but look at label...
 func (r *ReplicationReconciler) reconcileReplicationInPod(ctx context.Context, req *reconcileRequest, logger logr.Logger, index int, nextReplicationEpoch int) error {
 	pod := statefulset.PodName(req.doltdb.ObjectMeta, index)
 	primaryPodIndex := *req.doltdb.Status.CurrentPrimaryPodIndex
@@ -180,14 +178,4 @@ func (r *ReplicationReconciler) patchStatus(ctx context.Context, doltdb *doltv1a
 	patch := client.MergeFrom(doltdb.DeepCopy())
 	patcher(&doltdb.Status)
 	return r.Status().Patch(ctx, doltdb, patch)
-}
-
-func (r *ReplicationReconciler) patchReplicationEpochStatus(ctx context.Context, doltdb *doltv1alpha.DoltCluster, nextReplicaitonEpoch int) error {
-	if err := r.patchStatus(ctx, doltdb, func(status *doltv1alpha.DoltClusterStatus) {
-		status.UpdateReplicationEpoch(doltdb, nextReplicaitonEpoch)
-	}); err != nil {
-		return fmt.Errorf("error patching DoltDB replication epoch status: %v", err)
-	}
-
-	return nil
 }

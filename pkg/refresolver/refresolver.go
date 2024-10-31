@@ -6,6 +6,7 @@ import (
 
 	doltv1alpha1 "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
+	"github.com/electronicarts/doltdb-operator/pkg/statefulset"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,19 @@ func (r *RefResolver) DoltDB(ctx context.Context, ref *doltv1alpha1.DoltClusterR
 		return nil, err
 	}
 	return &doltdb, nil
+}
+
+// DoltDBPodRef retrieves a Pod resource based on the provided DoltCluster and podIndex.
+func (r *RefResolver) DoltDBPodRef(ctx context.Context, doltdb *doltv1alpha1.DoltCluster, index int) (*corev1.Pod, error) {
+	key := types.NamespacedName{
+		Name:      statefulset.PodName(doltdb.ObjectMeta, index),
+		Namespace: doltdb.Namespace,
+	}
+	var pod corev1.Pod
+	if err := r.client.Get(ctx, key, &pod); err != nil {
+		return nil, err
+	}
+	return &pod, nil
 }
 
 // DoltDBFromAnnotation retrieves a DoltCluster resource based on the annotation in the provided ObjectMeta.

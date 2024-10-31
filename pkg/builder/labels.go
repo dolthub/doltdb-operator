@@ -63,8 +63,7 @@ func (b *LabelsBuilder) WithLabels(labels map[string]string) *LabelsBuilder {
 
 // WithDoltSelectorLabels sets the app and instance labels for a DoltCluster.
 func (b *LabelsBuilder) WithDoltSelectorLabels(doltdb *doltv1alpha.DoltCluster) *LabelsBuilder {
-	return b.WithApp(doltdb.Name).
-		WithInstance(doltdb.Name)
+	return b.WithApp(doltdb.Name)
 }
 
 // WithPVCRole sets the PVC role label.

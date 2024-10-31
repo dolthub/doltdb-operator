@@ -15,7 +15,7 @@ func NewMetadataBuilder(key types.NamespacedName) *MetadataBuilder {
 		objMeta: metav1.ObjectMeta{
 			Name:        key.Name,
 			Namespace:   key.Namespace,
-			Labels:      NewLabelsBuilder().Build(),
+			Labels:      map[string]string{},
 			Annotations: map[string]string{},
 		},
 	}

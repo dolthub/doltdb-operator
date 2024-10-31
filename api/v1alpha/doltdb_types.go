@@ -195,7 +195,7 @@ type DoltClusterStatus struct {
 	ReplicationStatus ReplicationStatus `json:"replicationStatus,omitempty"`
 	// ReplicationEpoch holds dolt highest epoch value to perform switchovers
 	// +optional
-	ReplicationEpoch *int `json:"replication_epoch,omitempty"`
+	ReplicationEpoch *int `json:"replicationEpoch,omitempty"`
 }
 
 // +kubebuilder:object:root=true

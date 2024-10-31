@@ -38,9 +38,9 @@ func PodFQDNWithService(meta metav1.ObjectMeta, podIndex int, service string) st
 	return fmt.Sprintf("%s.%s", PodName(meta, podIndex), ServiceFQDNWithService(meta, service))
 }
 
-// PodShortFQDNWithService returns the short fully qualified domain name (FQDN) for a pod given its metadata, index, and service.
-func PodShortFQDNWithService(meta metav1.ObjectMeta, podIndex int, service string) string {
-	return fmt.Sprintf("%s.%s", PodName(meta, podIndex), service)
+// PodShortFQDNWithService returns the short fully qualified domain name (FQDN) for a pod given its metadata, index, service, and namespace
+func PodShortFQDNWithServiceAndNamespace(meta metav1.ObjectMeta, podIndex int, service string) string {
+	return fmt.Sprintf("%s.%s.%s", PodName(meta, podIndex), service, meta.Namespace)
 }
 
 // PodIndex extracts the index from a pod name.

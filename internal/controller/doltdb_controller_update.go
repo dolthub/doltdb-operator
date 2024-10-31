@@ -114,7 +114,7 @@ func (r *DoltDBReconciler) updatePod(ctx context.Context, doltdbKey types.Namesp
 
 func (r *DoltDBReconciler) pollUntilPodUpdated(ctx context.Context, doltdbKey, podKey types.NamespacedName, updateRevision string,
 	logger logr.Logger) error {
-	return wait.PollWithDoltCluster(ctx, doltdbKey, r.Client, logger, func(ctx context.Context) error {
+	return wait.PollWithDoltDB(ctx, doltdbKey, r.Client, logger, func(ctx context.Context) error {
 		var pod corev1.Pod
 		if err := r.Get(ctx, podKey, &pod); err != nil {
 			return fmt.Errorf("error getting Pod '%s': %v", podKey.Name, err)

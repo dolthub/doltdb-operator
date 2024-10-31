@@ -14,10 +14,10 @@ type ReplicationClientSet struct {
 	*sqlClient.ClientSet
 }
 
-func NewReplicationClientSet(doltCluster *doltv1alpha.DoltCluster, refResolver *refresolver.RefResolver) (*ReplicationClientSet, error) {
+func NewReplicationClientSet(doltCluster *doltv1alpha.DoltCluster, refResolver *refresolver.RefResolver) *ReplicationClientSet {
 	return &ReplicationClientSet{
 		ClientSet: sqlClient.NewClientSet(doltCluster, refResolver),
-	}, nil
+	}
 }
 
 func (c *ReplicationClientSet) close() error {
@@ -38,11 +38,3 @@ func (c *ReplicationClientSet) currentPrimaryClient(ctx context.Context) (*sqlCl
 	}
 	return client, nil
 }
-
-// func (c *ReplicationClientSet) newPrimaryClient(ctx context.Context) (*sqlClient.Client, error) {
-// 	client, err := c.ClientForIndex(ctx, *c.DoltDB.Replication().Primary.PodIndex)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error getting new primary client: %v", err)
-// 	}
-// 	return client, nil
-// }

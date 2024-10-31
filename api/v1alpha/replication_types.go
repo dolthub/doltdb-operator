@@ -21,6 +21,9 @@ type PrimaryReplication struct {
 	// AutomaticFailover indicates whether the operator should automatically update PodIndex to perform an automatic primary failover.
 	// +optional
 	AutomaticFailover *bool `json:"automaticFailover,omitempty"`
+	// MinCaughtUpStandbys is the minimum number of standbys that must be caught up before a primary failover can occur.
+	// +optional
+	MinCaughtUpStandbys *int `json:"minCaughtUpStandby,omitempty"`
 }
 
 // FillWithDefaults fills the current PrimaryReplication object with DefaultReplicationSpec.

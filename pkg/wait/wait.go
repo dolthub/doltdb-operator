@@ -24,9 +24,9 @@ func PollUntilSucessOrContextCancel(ctx context.Context, logger logr.Logger, fn 
 	})
 }
 
-// PollWithDoltCluster polls the provided function if the DoltCluster resource exists and is retrievable.
+// PollWithDoltDB polls the provided function if the DoltCluster resource exists and is retrievable.
 // It uses PollUntilSucessOrContextCancel for polling.
-func PollWithDoltCluster(ctx context.Context, doltdbKey types.NamespacedName, client ctrlclient.Client, logger logr.Logger,
+func PollWithDoltDB(ctx context.Context, doltdbKey types.NamespacedName, client ctrlclient.Client, logger logr.Logger,
 	fn func(ctx context.Context) error) error {
 	return PollUntilSucessOrContextCancel(ctx, logger, func(ctx context.Context) error {
 		if shouldPoll(ctx, doltdbKey, client, logger) {

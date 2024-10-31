@@ -68,6 +68,16 @@ func (r *PodReadinessController) ReconcilePodNotReady(ctx context.Context, pod c
 	}
 
 	fromIndex := doltdb.Status.CurrentPrimaryPodIndex
+
+	//TODO: implement minCaughtUpStandbys logic https://github.com/dolthub/doltclusterctl/blob/main/commands.go#L144
+	// minCaughtUpStandbys := ptr.Deref(doltdb.Replication().Primary.MinCaughtUpStandbys, -1)
+	// if minCaughtUpStandbys != -1 {
+	// 	toIndex, err := r.replConfig.GetNextPrimary(ctx, doltdb, nil, *doltdb.Status.ReplicationEpoch)
+	// 	if err != nil {
+	// 		return fmt.Errorf("error getting next primary: %v", err)
+	// 	}
+	// }
+
 	toIndex, err := health.HealthyDoltDBReplica(ctx, r, doltdb)
 	if err != nil {
 		return fmt.Errorf("error getting healthy Dolt replica: %v", err)
@@ -88,7 +98,7 @@ func (r *PodReadinessController) ReconcilePodNotReady(ctx context.Context, pod c
 		return fmt.Errorf("error patching DoltDB: %v", err)
 	}
 
-	logger.Info("Switching primary", "from-index", fromIndex, "to-index", *toIndex)
+	logger.Info("Switching primary", "from-index", *fromIndex, "to-index", *toIndex)
 	r.recorder.Eventf(doltdb, corev1.EventTypeNormal, doltv1alpha.ReasonPrimarySwitching,
 		"Switching primary from index '%d' to index '%d'", *fromIndex, *toIndex)
 

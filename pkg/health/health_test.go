@@ -316,7 +316,9 @@ func TestIsStatefulSetHealthy(t *testing.T) {
 				}
 			}
 
-			healthy, err := IsStatefulSetHealthy(context.Background(), client, types.NamespacedName{Name: "test-sts", Namespace: "default"}, tt.opts...)
+			key := types.NamespacedName{Name: "test-sts", Namespace: "default"}
+
+			healthy, err := IsStatefulSetHealthy(context.Background(), client, key, key, tt.opts...)
 			if healthy != tt.expected {
 				t.Errorf("expected healthy to be %v, got %v", tt.expected, healthy)
 			}

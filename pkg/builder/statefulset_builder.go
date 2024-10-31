@@ -41,7 +41,9 @@ func (b *Builder) BuildDoltStatefulSet(key types.NamespacedName, doltdb *doltv1a
 				MatchLabels: matchLabels,
 			},
 			ServiceName: "dolt-internal",
-			// UpdateStrategy: ,
+			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.OnDeleteStatefulSetStrategyType,
+			},
 			Replicas:             &doltdb.Spec.Replicas,
 			Template:             doltPodTemplate(objMeta, doltdb),
 			VolumeClaimTemplates: doltVolumeClaimTemplates(objMeta, doltdb),

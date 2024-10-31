@@ -19,7 +19,11 @@ import (
 )
 
 // IsStatefulSetHealthy checks if the StatefulSet specified by the key is healthy based on the provided health options.
-func IsStatefulSetHealthy(ctx context.Context, client ctrlclient.Client, key types.NamespacedName,
+func IsStatefulSetHealthy(
+	ctx context.Context,
+	client ctrlclient.Client,
+	key types.NamespacedName,
+	serviceKey types.NamespacedName,
 	opts ...HealthOpt) (bool, error) {
 	var sts appsv1.StatefulSet
 	if err := client.Get(ctx, key, &sts); err != nil {
@@ -42,7 +46,7 @@ func IsStatefulSetHealthy(ctx context.Context, client ctrlclient.Client, key typ
 	}
 
 	var endpoints corev1.Endpoints
-	if err := client.Get(ctx, key, &endpoints); err != nil {
+	if err := client.Get(ctx, serviceKey, &endpoints); err != nil {
 		return false, ctrlclient.IgnoreNotFound(err)
 	}
 	for _, subset := range endpoints.Subsets {
@@ -95,6 +99,54 @@ func HealthyDoltDBReplica(ctx context.Context, client ctrlclient.Client, doltClu
 		}
 	}
 	return nil, ErrNoHealthyInstancesAvailable
+}
+
+// IsDoltDBReplicaHealthy checks if the DoltDB replica specified by the podIndex is healthy.
+func IsDoltDBReplicaHealthy(ctx context.Context, client ctrlclient.Client, doltdb *doltv1alpha.DoltCluster, podIndex int) (*corev1.Pod, bool, error) {
+	podName := statefulset.PodName(doltdb.ObjectMeta, podIndex)
+	key := types.NamespacedName{
+		Name:      podName,
+		Namespace: doltdb.Namespace,
+	}
+	var doltPod corev1.Pod
+	if err := client.Get(ctx, key, &doltPod); err != nil {
+		return nil, false, err
+	}
+	return &doltPod, pod.PodReady(&doltPod), nil
+}
+
+// HealthyDoltDBStandbys returns a list of healthy DoltDB standbys that are not the current primary pod.
+func HealthyDoltDBStandbys(ctx context.Context, client ctrlclient.Client, doltdb *doltv1alpha.DoltCluster) ([]corev1.Pod, error) {
+	podList := corev1.PodList{}
+	listOpts := &ctrlclient.ListOptions{
+		LabelSelector: klabels.SelectorFromSet(
+			builder.NewLabelsBuilder().
+				WithDoltSelectorLabels(doltdb).
+				Build(),
+		),
+		Namespace: doltdb.GetNamespace(),
+	}
+
+	if err := client.List(ctx, &podList, listOpts); err != nil {
+		return nil, fmt.Errorf("error listing Pods: %v", err)
+	}
+	sortPodList(podList)
+
+	pods := make([]corev1.Pod, 0, len(podList.Items))
+	for _, p := range podList.Items {
+		index, err := statefulset.PodIndex(p.Name)
+		if err != nil {
+			return nil, fmt.Errorf("error getting index for Pod '%s': %v", p.Name, err)
+		}
+		if *index == *doltdb.Status.CurrentPrimaryPodIndex {
+			continue
+		}
+		if pod.PodReady(&p) {
+			pods = append(pods, p)
+		}
+	}
+
+	return pods, nil
 }
 
 // IsServiceHealthy checks if the service specified by the serviceKey has healthy endpoints.

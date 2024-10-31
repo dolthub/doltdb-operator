@@ -2,14 +2,17 @@ package replication
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
 	sqlClient "github.com/electronicarts/doltdb-operator/pkg/dolt/sql"
+	"github.com/electronicarts/doltdb-operator/pkg/health"
 	"github.com/electronicarts/doltdb-operator/pkg/refresolver"
 	"github.com/electronicarts/doltdb-operator/pkg/statefulset"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -69,4 +72,59 @@ func (r *ReplicationConfig) ConfigureReplica(
 		)
 	}
 	return nil
+}
+
+func (r *ReplicationConfig) GetNextPrimary(
+	ctx context.Context,
+	doltdb *doltv1alpha.DoltCluster,
+	client *sqlClient.Client,
+	epoch int,
+) (int, error) {
+	if doltdb.Status.CurrentPrimaryPodIndex == nil {
+		return -1, errors.New("'status.currentPrimaryPodIndex' must be set")
+	}
+
+	minCaughtUpStandbys := ptr.Deref(doltdb.Replication().Primary.MinCaughtUpStandbys, -1)
+	numStandbys := int(doltdb.Spec.Replicas) - 1
+	if minCaughtUpStandbys != -1 {
+		return -1, errors.New("minCaughtUpStandbys must be greater than -1")
+	}
+	if minCaughtUpStandbys > numStandbys {
+		return -1, errors.New("minCaughtUpStandbys must be less than the number of standbys")
+	}
+
+	healthyStandbys, err := health.HealthyDoltDBStandbys(ctx, r, doltdb)
+	if err != nil {
+		return -1, fmt.Errorf("error getting healthy DoltDB standby replicas: %v", err)
+	}
+
+	if len(healthyStandbys) < minCaughtUpStandbys {
+		return -1, fmt.Errorf("not enough healthy standbys to transition to primary: %d/%d", len(healthyStandbys), minCaughtUpStandbys)
+	}
+
+	hosts := make([]string, len(healthyStandbys))
+	for i, standby := range healthyStandbys {
+		podIndex, err := statefulset.PodIndex(standby.Name)
+		if err != nil {
+			return -1, fmt.Errorf("error getting index for Pod '%s': %v", standby.Name, err)
+		}
+		hosts[i] = statefulset.PodShortFQDNWithServiceAndNamespace(doltdb.ObjectMeta, *podIndex, doltdb.InternalServiceKey().Name)
+	}
+
+	assumeRoleOpts := sqlClient.TransitionStandbyOpts{
+		Epoch:               epoch,
+		MinCaughtUpStandbys: minCaughtUpStandbys,
+		Hosts:               hosts,
+	}
+
+	nextPrimary, err := client.TransitionToStandby(ctx, assumeRoleOpts)
+	if err != nil {
+		return -1, fmt.Errorf("error configuring transitioning primary %d to standby and finding next primary at epoch %d: %v",
+			*doltdb.Status.CurrentPrimaryPodIndex,
+			epoch,
+			err,
+		)
+	}
+
+	return nextPrimary, nil
 }

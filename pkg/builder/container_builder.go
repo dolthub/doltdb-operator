@@ -92,10 +92,6 @@ func doltContainers(doltdb *doltv1alpha.DoltCluster) []corev1.Container {
 					ContainerPort: DoltMySQLPort,
 					Name:          DoltContainerName,
 				},
-				{
-					ContainerPort: DoltRemoteAPIPort,
-					Name:          "grpc",
-				},
 			},
 			VolumeMounts: doltVolumeMounts(),
 		},
@@ -110,10 +106,20 @@ func doltInitContainers(doltdb *doltv1alpha.DoltCluster) []corev1.Container {
 			Name:            DoltInitContainerName,
 			Image:           fmt.Sprintf("%s:%s", doltdb.Spec.Image, doltdb.Spec.EngineVersion),
 			ImagePullPolicy: corev1.PullIfNotPresent,
-			Command:         []string{"/bin/sh", "-c", "cp /etc/doltdb/${POD_NAME}.yaml config.yaml"},
-			WorkingDir:      DoltDataMountPath,
-			Env:             doltEnv(doltdb),
-			VolumeMounts:    doltVolumeMounts(),
+			Command: []string{
+				"/bin/sh",
+				"-c",
+				`
+				dolt config --global --add user.name "dolt kubernetes deployment"
+				dolt config --global --add user.email "dolt@kubernetes.deployment"
+				cp /etc/doltdb/${POD_NAME}.yaml config.yaml
+				if [ -n "$DOLT_PASSWORD" -a ! -f .doltcfg/privileges.db ]; then
+					dolt sql -q "create user '$DOLT_USERNAME' identified by '$DOLT_PASSWORD'; grant all privileges on *.* to '$DOLT_USERNAME' with grant option;"
+				fi`,
+			},
+			WorkingDir:   DoltDataMountPath,
+			Env:          doltEnv(doltdb),
+			VolumeMounts: doltVolumeMounts(),
 		},
 	}
 
