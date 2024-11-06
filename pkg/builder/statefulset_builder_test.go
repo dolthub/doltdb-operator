@@ -100,9 +100,8 @@ func TestDoltDBStatefulSetMeta(t *testing.T) {
 			wantMeta: &doltv1alpha.DoltCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app.kubernetes.io/instance": "doltdb",
-						"app.kubernetes.io/name":     "doltdb",
-						"app.kubernetes.io/version":  "1.43.5",
+						"app.kubernetes.io/name":    "doltdb",
+						"app.kubernetes.io/version": "1.43.5",
 					},
 					Annotations: map[string]string{
 						"k8s.dolthub.com/doltdb":      objMeta.Name,
@@ -113,9 +112,8 @@ func TestDoltDBStatefulSetMeta(t *testing.T) {
 			wantPodMeta: &doltv1alpha.DoltCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app.kubernetes.io/instance": "doltdb",
-						"app.kubernetes.io/name":     "doltdb",
-						"app.kubernetes.io/version":  "1.43.5",
+						"app.kubernetes.io/name":    "doltdb",
+						"app.kubernetes.io/version": "1.43.5",
 					},
 					Annotations: map[string]string{
 						"k8s.dolthub.com/doltdb":      objMeta.Name,

@@ -34,7 +34,7 @@ cluster:
   bootstrap_role: primary
   standby_remotes:
   - name: test-cluster-1
-    remote_url_template: http://test-cluster-1.test-cluster-internal:50051/{database}
+    remote_url_template: http://test-cluster-1.test-cluster-internal.default:50051/{database}
 listener:
   host: 0.0.0.0
   max_connections: 128
@@ -48,7 +48,7 @@ cluster:
   bootstrap_role: standby
   standby_remotes:
   - name: test-cluster-0
-    remote_url_template: http://test-cluster-0.test-cluster-internal:50051/{database}
+    remote_url_template: http://test-cluster-0.test-cluster-internal.default:50051/{database}
 listener:
   host: 0.0.0.0
   max_connections: 128

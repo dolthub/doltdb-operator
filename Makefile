@@ -61,11 +61,11 @@ vet: ## Run go vet against code.
 
 .PHONY: test-int
 test-int: ## Run tests.
-	go test ./internal/controller/...--timeout 5m 
+	go test ./internal/controller/... -v -ginkgo.v --coverprofile=cover.out --timeout 5m 
 
 .PHONY: test
 test: ## Run tests.
-	go test $$(go list ./...| grep -v ./internal/controller/) -race -coverprofile cover.out
+	go test $$(go list ./...| grep -v /internal/controller) -race -coverprofile cover.out
 
 
 .PHONY: lint
@@ -216,5 +216,3 @@ mv $(1) $(1)-$(3) ;\
 echo "$(1)-$(3) $(1)"
 ln -sf $(1)-$(3) $(1)
 endef
-
-include make/test.mk

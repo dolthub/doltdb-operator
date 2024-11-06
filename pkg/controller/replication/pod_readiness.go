@@ -84,8 +84,8 @@ func (r *PodReadinessController) ReconcilePodNotReady(ctx context.Context, pod c
 	}
 
 	var errBundle *multierror.Error
-	err = r.patch(ctx, doltdb, func(mdb *doltv1alpha.DoltCluster) {
-		mdb.Replication().Primary.PodIndex = toIndex
+	err = r.patch(ctx, doltdb, func(doltdb *doltv1alpha.DoltCluster) {
+		doltdb.Replication().Primary.PodIndex = toIndex
 	})
 	errBundle = multierror.Append(errBundle, err)
 
