@@ -4,11 +4,13 @@ variables:
   # Tooling versions for CI builds.
   # These versions should be driven down through all Makefiles, scripts, and Dockerfiles.
   HELM_VERSION: '3.16.2'
+  GOLANG_VERSION: '1.23.2'
   KUBECTL_VERSION: '1.30.2'
   # TODO(asnyder): Update version once https://github.com/norwoodj/helm-docs/pull/112 is merged/released.
   HELM_DOCS_VERSION: 'v1.14.2'
   CONFTEST_VERSION: '0.26.0'
   CHART_TESTING_VERSION: '3.4.0'
+  GOLANGCI_LINT_VERSION: '1.59.1'
   # Other variables.
   DOCKER_HUB_PROXY: docker.io
   DOCKER_VERSION: 27
@@ -48,18 +50,18 @@ workflow:
 # Trigger reference: https://docs.gitlab.com/ee/ci/yaml/index.html#trigger
 # Rules reference: https://docs.gitlab.com/ee/ci/yaml/index.html#rules
 
-#charts:test:
-#  trigger:
-#    include:
-#      - local: charts/.gitlab-ci.yml
-#    strategy: depend
-#  rules:
-#    # In merge requests pipelines, only trigger the sub-project tests if there are code changes.
-#    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-#      changes:
-#        - 'charts/**/*'
-#    # Trigger the tests for all other pipeline types.
-#    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+charts:test:
+  trigger:
+    include:
+      - local: charts/.gitlab-ci.yml
+    strategy: depend
+  rules:
+    # In merge requests pipelines, only trigger the sub-project tests if there are code changes.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - 'charts/**/*'
+    # Trigger the tests for all other pipeline types.
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
 
 
 ## ROOT TEST JOBS ##
@@ -84,7 +86,11 @@ empty:test:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
-        - 'operator/**/*'
+        - 'api/*'
+        - 'cmd/*'
+        - 'internal/*'
+        - 'api/*'
+        - 'pkg/*'
         - 'charts/**/*'
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -101,7 +107,7 @@ empty:test:
     # Template-in the release variables for the operator image.
     - sed -i
       -e "s|%%image_tag%%|${RELEASE_VERSION}|g"
-      -e "s|%%image_repository%%|harbor/dolt/${RELEASE_CHANNEL}/dolt-operator|g"
+      -e "s|%%image_repository%%|${HARBOR_REGISTRY}/${HELM_PROJECT}/dolt-operator|g"
       ./dolt-operator/values.yaml
     # Re-run the README generation for the new values.
     - make generate-docs
@@ -113,15 +119,53 @@ empty:test:
 
 
 
+
+.image:deploy:
+  stage: deploy
+  extends:
+    - .dind
+  script:
+    - echo "Release Version=$RELEASE_VERSION, Release Channel=$RELEASE_CHANNEL, Branch=$CI_COMMIT_BRANCH, Protected=$CI_COMMIT_REF_PROTECTED"
+    - REPOSITORY=${HARBOR_REGISTRY}/${HELM_PROJECT}/dolt-operator
+    - echo "$HARBOR_PASSWORD" | docker login ${HARBOR_REGISTRY} -u "$HARBOR_USERNAME" --password-stdin
+    - docker build -t $REPOSITORY:$RELEASE_VERSION -t $REPOSITORY:latest --build-arg GOLANG_VERSION --build-arg DOCKER_HUB_PROXY .
+    - docker push ${HARBOR_REGISTRY}/${HELM_PROJECT}/dolt-operator:$RELEASE_VERSION
+    - docker push ${HARBOR_REGISTRY}/${HELM_PROJECT}/dolt-operator:latest
+
+.deploy:manual:
+  rules:
+    - if: $CI_COMMIT_REF_PROTECTED != "true" && ($CI_COMMIT_BRANCH == null || $CI_COMMIT_TAG == null)
+      when: manual
+  allow_failure: true
+
+
+# Only run when branch is protected and the project is not a fork and only on branches or tags (not merge requests)
+image:deploy:
+  extends:
+    - .image:deploy
+  rules:
+    - if: $CI_COMMIT_REF_PROTECTED == "true" && $CI_PROJECT_NAMESPACE == "stellar" && ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG)
+
+
+# Only run when branch is non-protected and the project is not a fork and only on branches (not merge requests)
+image:deploy:manual:
+  extends:
+    - .image:deploy
+    - .deploy:manual
+
 # Only run when branch is non-protected and the project is not a fork and only on branches (not merge requests)
 chart:deploy:manual-harbor:
   extends:
     - .chart-release-harbor
+    - .deploy:manual
 
 # Only run when branch is protected and the project is not a fork and only on branches or tags (not merge requests)
 chart:deploy-harbor:
   extends:
     - .chart-release-harbor
+  needs:
+    # Since we template-in the image tag, make sure the image was able to be pushed first.
+    - image:deploy
   rules:
     - if: $CI_COMMIT_REF_PROTECTED == "true"  && ($CI_COMMIT_BRANCH || $CI_COMMIT_TAG)
 
@@ -138,7 +182,6 @@ chart:deploy-harbor:
     - helm cm-push dolt-operator-${RELEASE_VERSION}.tgz ${HELM_PROJECT}
   before_script:
     - echo "Running the release job."
-
 
 operator:test:
   trigger:

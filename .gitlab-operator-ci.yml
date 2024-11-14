@@ -32,3 +32,24 @@ workflow:
 test:
   extends: .make
   script: make tiltci
+  artifacts:
+    reports:
+      junit: '**/junit.xml'
+      coverage_report:
+        coverage_format: cobertura
+        path: cover.xml
+    expire_in: 1 month
+
+lint:
+  stage: test
+  image: ${DOCKER_HUB_PROXY}/golangci/golangci-lint:v${GOLANGCI_LINT_VERSION}
+  script:
+    # Generate a code quality report for GitLab to show in MRs.
+    - golangci-lint run --issues-exit-code 0 --out-format code-climate > gl-code-quality-report.json
+    # Run again (using cached results) to show results in job output.
+    - golangci-lint run --color always || { echo 'Linter is configured in .golangci.yaml file.'; false; }
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+    expire_in: 1 month
+  allow_failure: true
