@@ -4,7 +4,7 @@
 
 set -e
 
-. helm/lib.sh
+. hack/helm/lib.sh
 
 # Input variables.
 CHART_TESTING_VERSION="${CHART_TESTING_VERSION:-}"
