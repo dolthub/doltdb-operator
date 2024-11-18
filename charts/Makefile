@@ -16,7 +16,7 @@ update-dependencies:
 # Verify that README.md documentation was generated for all Helm charts.
 verify-docs:
 	@echo '== BEGIN VERIFY DOCS =='
-	@../hack/helm/hack/verify_docs.sh
+	@../hack/helm/verify_docs.sh
 	@echo '== END VERIFY DOCS =='
 
 # Lint all Helm charts.
