@@ -41,13 +41,11 @@ workflow:
     - if: $CI_COMMIT_TAG
       variables:
         RELEASE_VERSION: $CI_COMMIT_TAG
-        RELEASE_CHANNEL: stable
     # Match remaining pipeline types.
     - when: always
       variables:
         # The v0.0.0 prefix is to create a valid semver that GitLab Helm registry recognizes.
         RELEASE_VERSION: v0.0.0-${CI_PIPELINE_ID}
-        RELEASE_CHANNEL: edge
 
 empty:test:
   image: ${DOCKER_HUB_PROXY}/alpine

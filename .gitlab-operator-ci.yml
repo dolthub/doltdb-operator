@@ -32,13 +32,6 @@ workflow:
 test:
   extends: .make
   script: make tiltci
-  artifacts:
-    reports:
-      junit: '**/junit.xml'
-      coverage_report:
-        coverage_format: cobertura
-        path: cover.xml
-    expire_in: 1 month
 
 lint:
   stage: test
