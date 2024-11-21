@@ -7,11 +7,12 @@ load('ext://helm_resource', 'helm_resource', 'helm_repo')
 # git_checkout('REDACTED', checkout_dir="tilt_git/common_tilt")
 # _mydir = os.path.abspath(os.path.dirname(__file__))
 # load('tilt_git/common_tilt/Tiltfile', 'setup_harbor_repo')
-
+namespace_create('glrunner')
 local_resource('Go Deps', cmd='make vendor', deps=['Makefile', 'go.mod', 'go.sum'])
 local_resource('Build manifests', cmd='make manifests', deps=['Makefile', 'make/*'])
 local_resource('Generate CRDs', cmd='make generate', deps=['Makefile', 'make/*'])
 local_resource('Install CRDs', cmd='make install', deps=['Makefile', 'make/*'])
+
 
 docker_build('localhost:5000/dolt-operator-test-runner', '.', dockerfile="Dockerfile.dev")
 

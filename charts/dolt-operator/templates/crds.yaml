@@ -1,0 +1,13 @@
+{{- $crdOverlay := include "dolt-operator.crdOverlay" . | fromYaml }}
+
+{{- range $path, $_ := .Files.Glob "generated/crd/*" }}
+
+{{- /* Build the CRD from the generated base and overlays. */}}
+{{- $crd := $.Files.Get $path | fromYaml }}
+{{- $crd = merge $crd $crdOverlay }}
+
+{{- /* Print the CRD yaml */}}
+{{- $crd | toYaml }}
+---
+
+{{- end }}

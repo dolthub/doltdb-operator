@@ -1,0 +1,48 @@
+# GitLab CI yaml reference: https://docs.gitlab.com/ee/ci/yaml/index.html
+
+# This is a sub-project and will be triggered as a child pipeline from the root .gitlab-ci.yml.
+# Variables are declared in the root .gitlab-ci.yml.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+
+
+.make:
+  image: $DOCKER_HUB_PROXY/docker:$DOCKER_VERSION-dind
+  services:
+    - name: $DOCKER_HUB_PROXY/docker:$DOCKER_VERSION-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://localhost:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  tags:
+    - glaas-shared-k8s-dind
+  retry: 2 # The DinD runners frequently run into errors.
+  before_script:
+    - apk add --no-cache curl bash make git kubectl
+    - make go-ci
+    - export PATH=${PATH}:/usr/local/go/bin
+    - make kind
+    - make tilt-ci
+    - make cluster-ci
+    - make cluster-ctx
+    - make kustomize-ci
+test:
+  extends: .make
+  script: make tiltci
+
+lint:
+  stage: test
+  image: ${DOCKER_HUB_PROXY}/golangci/golangci-lint:v${GOLANGCI_LINT_VERSION}
+  script:
+    # Generate a code quality report for GitLab to show in MRs.
+    - golangci-lint run --issues-exit-code 0 --out-format code-climate > gl-code-quality-report.json
+    # Run again (using cached results) to show results in job output.
+    - golangci-lint run --color always || { echo 'Linter is configured in .golangci.yaml file.'; false; }
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+    expire_in: 1 month
+  allow_failure: true

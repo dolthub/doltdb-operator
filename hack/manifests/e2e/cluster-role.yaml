@@ -20,6 +20,9 @@ subjects:
   - kind: ServiceAccount
     name: dolt-operator-test-runner-sa
     namespace: default
+  - kind: ServiceAccount
+    name: dolt-operator-test-runner-sa
+    namespace: glrunner
 roleRef:
   kind: ClusterRole
   name: dolt-operator-test-runner-clusterrole
