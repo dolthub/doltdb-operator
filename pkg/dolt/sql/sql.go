@@ -99,8 +99,13 @@ func NewClientWithDoltDB(ctx context.Context, doltdb *doltv1alpha1.DoltDB, refRe
 	if err != nil {
 		return nil, fmt.Errorf("error reading root password secret: %v", err)
 	}
+	username, err := refResolver.SecretKeyRef(ctx, doltdb.RootUserSecretKeyRef(), doltdb.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("error reading root username secret: %v", err)
+	}
+
 	opts := []Opt{
-		WithUsername("root"),
+		WithUsername(username),
 		WithPassword(password),
 		WitHost(func() string {
 			return statefulset.ServiceFQDNWithService(
