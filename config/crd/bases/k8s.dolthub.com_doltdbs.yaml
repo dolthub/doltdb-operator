@@ -1069,7 +1069,7 @@ spec:
                    - DirectStandby (default): Direct-to-standby replication
                    - Remote: Remote-based replication
                 type: string
-              resource:
+              resources:
                 description: ResourceRequirements describes the compute resource requirements.
                 properties:
                   claims:

@@ -60,7 +60,7 @@ type DoltDBSpec struct {
 	PodDisruptionBudget *PodDisruptionBudget `json:"podDisruptionBudget,omitempty"`
 
 	// +optional
-	Resources *v1.ResourceRequirements `json:"resource,omitempty"`
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 
 	// Volume defines the volume configuration for the Dolt cluster.
 	Storage Storage `json:"storage"`
