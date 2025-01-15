@@ -89,16 +89,19 @@ ln -sf $(1)-$(3) $(1)
 endef
 
 
-.PHONY: tilt-ci
-tilt-ci:
-	curl -fsSL https://github.com/tilt-dev/tilt/releases/download/v0.33.21/tilt.0.33.21.linux-alpine.x86_64.tar.gz | tar -xzv tilt && \
-    mv tilt /usr/local/bin/tilt
+.PHONY: install-tilt-ci
+install-tilt-ci: TILT_VERSION ?= 0.33.21
+install-tilt-ci:
+	curl -fsSL https://github.com/tilt-dev/tilt/releases/download/v$(TILT_VERSION)/tilt.$(TILT_VERSION).linux-alpine.x86_64.tar.gz | tar -xzv tilt && \
+	mv tilt /usr/local/bin/tilt
 
-.PHONY: kustomize-ci
-kustomize-ci:
-	curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.5.0/kustomize_v5.5.0_linux_amd64.tar.gz | tar -xzv kustomize && \
-    mv kustomize /usr/local/bin/kustomize
+.PHONY: install-kustomize-ci
+install-kustomize-ci: KUSTOMIZE_VERSION ?= v5.5.0
+install-kustomize-ci:
+	curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/$(KUSTOMIZE_VERSION)/kustomize_$(KUSTOMIZE_VERSION)_linux_amd64.tar.gz | tar -xzv kustomize && \
+	mv kustomize /usr/local/bin/kustomize
 
-.PHONY: go-ci
-go-ci:
-	curl -LO https://go.dev/dl/go1.23.3.linux-amd64.tar.gz && tar -C /usr/local -xvzf go1.23.3.linux-amd64.tar.gz
+.PHONY: install-go-ci
+install-go-ci: GO_VERSION ?= 1.23.3
+install-go-ci:
+	curl -LO https://go.dev/dl/go$(GO_VERSION).linux-amd64.tar.gz && tar -C /usr/local -xvzf go$(GO_VERSION).linux-amd64.tar.gz

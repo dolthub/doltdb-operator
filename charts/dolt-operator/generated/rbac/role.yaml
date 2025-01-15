@@ -89,6 +89,7 @@ rules:
 - apiGroups:
   - k8s.dolthub.com
   resources:
+  - databases
   - doltdbs
   verbs:
   - create
@@ -101,12 +102,14 @@ rules:
 - apiGroups:
   - k8s.dolthub.com
   resources:
+  - databases/finalizers
   - doltdbs/finalizers
   verbs:
   - update
 - apiGroups:
   - k8s.dolthub.com
   resources:
+  - databases/status
   - doltdbs/status
   verbs:
   - get

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	doltv1alpha1 "github.com/electronicarts/doltdb-operator/api/v1alpha"
+	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,13 +17,13 @@ import (
 
 func TestDoltDBFromAnnotation(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = doltv1alpha1.AddToScheme(scheme)
+	_ = doltv1alpha.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
 		objMeta       metav1.ObjectMeta
-		expectedDolt  *doltv1alpha1.DoltDB
+		expectedDolt  *doltv1alpha.DoltDB
 		expectedError error
 	}{
 		{
@@ -42,7 +42,7 @@ func TestDoltDBFromAnnotation(t *testing.T) {
 				},
 				Namespace: "default",
 			},
-			expectedError: apierrors.NewNotFound(doltv1alpha1.GroupVersion.WithResource("doltdbs").GroupResource(), "dolt-cluster"),
+			expectedError: apierrors.NewNotFound(doltv1alpha.GroupVersion.WithResource("doltdbs").GroupResource(), "dolt-cluster"),
 		},
 		{
 			name: "dolt cluster found",
@@ -52,7 +52,7 @@ func TestDoltDBFromAnnotation(t *testing.T) {
 				},
 				Namespace: "default",
 			},
-			expectedDolt: &doltv1alpha1.DoltDB{
+			expectedDolt: &doltv1alpha.DoltDB{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "dolt-cluster",
 					Namespace: "default",
@@ -88,34 +88,34 @@ func TestDoltDBFromAnnotation(t *testing.T) {
 
 func TestDoltDB(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = doltv1alpha1.AddToScheme(scheme)
+	_ = doltv1alpha.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
-		ref           *doltv1alpha1.DoltClusterRef
+		ref           *doltv1alpha.DoltDBRef
 		namespace     string
-		expectedDolt  *doltv1alpha1.DoltDB
+		expectedDolt  *doltv1alpha.DoltDB
 		expectedError error
 	}{
 		{
 			name: "dolt cluster not found",
-			ref: &doltv1alpha1.DoltClusterRef{
-				ObjectReference: doltv1alpha1.ObjectReference{
+			ref: &doltv1alpha.DoltDBRef{
+				ObjectReference: doltv1alpha.ObjectReference{
 					Name: "dolt-cluster",
 				},
 			},
 			namespace:     "default",
-			expectedError: apierrors.NewNotFound(doltv1alpha1.GroupVersion.WithResource("doltdbs").GroupResource(), "dolt-cluster"),
+			expectedError: apierrors.NewNotFound(doltv1alpha.GroupVersion.WithResource("doltdbs").GroupResource(), "dolt-cluster"),
 		},
 		{
 			name: "dolt cluster found",
-			ref: &doltv1alpha1.DoltClusterRef{
-				ObjectReference: doltv1alpha1.ObjectReference{
+			ref: &doltv1alpha.DoltDBRef{
+				ObjectReference: doltv1alpha.ObjectReference{
 					Name: "dolt-cluster",
 				},
 			},
 			namespace: "default",
-			expectedDolt: &doltv1alpha1.DoltDB{
+			expectedDolt: &doltv1alpha.DoltDB{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "dolt-cluster",
 					Namespace: "default",
@@ -155,7 +155,7 @@ func TestSecretKeyRef(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		selector      doltv1alpha1.SecretKeySelector
+		selector      doltv1alpha.SecretKeySelector
 		namespace     string
 		secret        *corev1.Secret
 		expectedValue string
@@ -163,8 +163,8 @@ func TestSecretKeyRef(t *testing.T) {
 	}{
 		{
 			name: "secret not found",
-			selector: doltv1alpha1.SecretKeySelector{
-				LocalObjectReference: doltv1alpha1.LocalObjectReference{
+			selector: doltv1alpha.SecretKeySelector{
+				LocalObjectReference: doltv1alpha.LocalObjectReference{
 					Name: "my-secret",
 				},
 				Key: "my-key",
@@ -174,8 +174,8 @@ func TestSecretKeyRef(t *testing.T) {
 		},
 		{
 			name: "secret key not found",
-			selector: doltv1alpha1.SecretKeySelector{
-				LocalObjectReference: doltv1alpha1.LocalObjectReference{
+			selector: doltv1alpha.SecretKeySelector{
+				LocalObjectReference: doltv1alpha.LocalObjectReference{
 					Name: "my-secret",
 				},
 				Key: "my-key",
@@ -192,8 +192,8 @@ func TestSecretKeyRef(t *testing.T) {
 		},
 		{
 			name: "secret key found",
-			selector: doltv1alpha1.SecretKeySelector{
-				LocalObjectReference: doltv1alpha1.LocalObjectReference{
+			selector: doltv1alpha.SecretKeySelector{
+				LocalObjectReference: doltv1alpha.LocalObjectReference{
 					Name: "my-secret",
 				},
 				Key: "my-key",
@@ -246,7 +246,7 @@ func TestConfigMapKeyRef(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		selector      *doltv1alpha1.ConfigMapKeySelector
+		selector      *doltv1alpha.ConfigMapKeySelector
 		namespace     string
 		configMap     *corev1.ConfigMap
 		expectedValue string
@@ -254,8 +254,8 @@ func TestConfigMapKeyRef(t *testing.T) {
 	}{
 		{
 			name: "configmap not found",
-			selector: &doltv1alpha1.ConfigMapKeySelector{
-				LocalObjectReference: doltv1alpha1.LocalObjectReference{
+			selector: &doltv1alpha.ConfigMapKeySelector{
+				LocalObjectReference: doltv1alpha.LocalObjectReference{
 					Name: "my-cm",
 				},
 				Key: "my-key",
@@ -265,8 +265,8 @@ func TestConfigMapKeyRef(t *testing.T) {
 		},
 		{
 			name: "configmap key not found",
-			selector: &doltv1alpha1.ConfigMapKeySelector{
-				LocalObjectReference: doltv1alpha1.LocalObjectReference{
+			selector: &doltv1alpha.ConfigMapKeySelector{
+				LocalObjectReference: doltv1alpha.LocalObjectReference{
 					Name: "my-configmap",
 				},
 				Key: "my-key",
@@ -283,8 +283,8 @@ func TestConfigMapKeyRef(t *testing.T) {
 		},
 		{
 			name: "configmap key found",
-			selector: &doltv1alpha1.ConfigMapKeySelector{
-				LocalObjectReference: doltv1alpha1.LocalObjectReference{
+			selector: &doltv1alpha.ConfigMapKeySelector{
+				LocalObjectReference: doltv1alpha.LocalObjectReference{
 					Name: "my-configmap",
 				},
 				Key: "my-key",

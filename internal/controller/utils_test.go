@@ -11,11 +11,14 @@ import (
 
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
+	"github.com/electronicarts/doltdb-operator/pkg/statefulset"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 )
@@ -32,6 +35,11 @@ var (
 
 	testDoltCredentialsKey = types.NamespacedName{
 		Name:      "dolt-credentials",
+		Namespace: testDoltKey.Namespace,
+	}
+
+	testDatabaseKey = types.NamespacedName{
+		Name:      "dolt-database-create-test",
 		Namespace: testDoltKey.Namespace,
 	}
 )
@@ -71,8 +79,8 @@ func testCreateInitialData(ctx context.Context) {
 		},
 		Spec: doltv1alpha.DoltDBSpec{
 			Image:               "dolthub/dolt",
-			EngineVersion:       "1.10.1",
-			Replicas:            3,
+			EngineVersion:       "1.45.1",
+			Replicas:            2,
 			ReplicationStrategy: doltv1alpha.DirectStandby,
 			Storage: doltv1alpha.Storage{
 				Size:             ptr.To(resource.MustParse("1Gi")),
@@ -100,6 +108,16 @@ func testCreateInitialData(ctx context.Context) {
 					},
 				},
 			},
+			Probes: doltv1alpha.Probes{
+				LivenessProbe: &corev1.Probe{
+					InitialDelaySeconds: 15,
+					PeriodSeconds:       10,
+				},
+				ReadinessProbe: &corev1.Probe{
+					InitialDelaySeconds: 15,
+					PeriodSeconds:       10,
+				},
+			},
 		},
 	}
 
@@ -113,7 +131,7 @@ func testCreateInitialData(ctx context.Context) {
 }
 
 func testCleanupInitialData(ctx context.Context) {
-	deleteDoltDB(ctx, testDoltKey)
+	deleteDoltDB(ctx, testDoltKey, testDoltCredentialsKey)
 }
 
 func expectReady(ctx context.Context, k8sClient client.Client, key types.NamespacedName) {
@@ -131,10 +149,10 @@ func expectFn(ctx context.Context, k8sClient client.Client, key types.Namespaced
 	}, testHighTimeout, testInterval).Should(BeTrue())
 }
 
-func deleteDoltDB(ctx context.Context, key types.NamespacedName) {
+func deleteDoltDB(ctx context.Context, key types.NamespacedName, secretKey types.NamespacedName) {
 	By("Deleting Secret")
 	var doltSecret v1.Secret
-	Expect(k8sClient.Get(ctx, testDoltCredentialsKey, &doltSecret)).To(Succeed())
+	Expect(k8sClient.Get(ctx, secretKey, &doltSecret)).To(Succeed())
 	Expect(k8sClient.Delete(ctx, &doltSecret)).To(Succeed())
 
 	var doltdb doltv1alpha.DoltDB
@@ -152,5 +170,74 @@ func deleteDoltDB(ctx context.Context, key types.NamespacedName) {
 		client.InNamespace(doltdb.Namespace),
 	}
 	Expect(k8sClient.DeleteAllOf(ctx, &corev1.PersistentVolumeClaim{}, opts...)).To(Succeed())
+}
 
+func testDoltDBStorageResize(doltdb *doltv1alpha.DoltDB, newVolumeSize string) {
+	key := client.ObjectKeyFromObject(doltdb)
+
+	By("Updating storage")
+	doltdb.Spec.Storage.Size = ptr.To(resource.MustParse(newVolumeSize))
+	Expect(k8sClient.Update(ctx, doltdb)).To(Succeed())
+
+	By("Expecting DoltDB to have resized storage eventually")
+	Eventually(func() bool {
+		if err := k8sClient.Get(ctx, key, doltdb); err != nil {
+			return false
+		}
+		return doltdb.IsReady() && meta.IsStatusConditionTrue(doltdb.Status.Conditions, doltv1alpha.ConditionTypeStorageResized)
+	}, testHighTimeout, testInterval).Should(BeTrue())
+
+	By("Expecting StatefulSet storage to have been resized")
+	var sts appsv1.StatefulSet
+	Expect(k8sClient.Get(ctx, key, &sts)).To(Succeed())
+	doltDBSize := doltdb.Spec.Storage.Size
+	stsSize := statefulset.GetStorageSize(&sts, builder.DoltDataVolume)
+	Expect(doltDBSize).NotTo(BeNil())
+	Expect(stsSize).NotTo(BeNil())
+	Expect(doltDBSize.Cmp(*stsSize)).To(Equal(0))
+
+	By("Expecting PVCs to have been resized")
+	pvcList := corev1.PersistentVolumeClaimList{}
+	listOpts := client.ListOptions{
+		LabelSelector: klabels.SelectorFromSet(
+			builder.NewLabelsBuilder().
+				WithDoltSelectorLabels(doltdb).
+				WithPVCRole(builder.DoltDataVolume).
+				Build(),
+		),
+		Namespace: doltdb.GetNamespace(),
+	}
+	Expect(k8sClient.List(ctx, &pvcList, &listOpts)).To(Succeed())
+	for _, p := range pvcList.Items {
+		pvcSize := p.Spec.Resources.Requests[corev1.ResourceStorage]
+		Expect(doltDBSize.Cmp(pvcSize)).To(Equal(0))
+	}
+}
+
+func testDoltDBUpdate(doltdb *doltv1alpha.DoltDB) {
+	key := client.ObjectKeyFromObject(doltdb)
+
+	By("Updating DoltDB compute resources")
+	Eventually(func() bool {
+		if err := k8sClient.Get(ctx, key, doltdb); err != nil {
+			return false
+		}
+
+		doltdb.Spec.Resources.Requests = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("256Mi"),
+		}
+
+		doltdb.Annotations["k8s.dolthub.com/updated-at"] = time.Now().String()
+
+		return k8sClient.Update(ctx, doltdb) == nil
+	}, testTimeout, testInterval).Should(BeTrue())
+
+	By("Expecting DoltDB to be updated eventually")
+	Eventually(func() bool {
+		if err := k8sClient.Get(ctx, key, doltdb); err != nil {
+			return false
+		}
+		return doltdb.IsReady() && meta.IsStatusConditionTrue(doltdb.Status.Conditions, doltv1alpha.ConditionTypeUpdated)
+	}, testHighTimeout, testInterval).Should(BeTrue())
 }

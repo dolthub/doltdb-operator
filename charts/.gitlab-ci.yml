@@ -1,7 +1,8 @@
 
-
-
-# GitLab CI yaml reference: https://docs.gitlab.com/ee/ci/yaml/index.html
+include:
+  - project: "REDACTED"
+    ref: main
+    file: "docker.yml"
 
 # This is a sub-project and will be triggered as a child pipeline from the root .gitlab-ci.yml.
 # Variables are declared in the root .gitlab-ci.yml.
@@ -10,17 +11,7 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
 
 .make:
-  image: $DOCKER_HUB_PROXY/docker:$DOCKER_VERSION-dind
-  services:
-    - name: $DOCKER_HUB_PROXY/docker:$DOCKER_VERSION-dind
-      alias: docker
-  variables:
-    DOCKER_HOST: tcp://localhost:2376
-    DOCKER_TLS_CERTDIR: "/certs"
-    DOCKER_TLS_VERIFY: 1
-    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
-  tags:
-    - glaas-shared-k8s-dind
+  extends: .dind
   retry: 2 # The DinD runners frequently run into errors.
   before_script:
     - apk add --no-cache git bash make

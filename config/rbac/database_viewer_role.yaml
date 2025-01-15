@@ -1,0 +1,23 @@
+# permissions for end users to view databases.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: dolt-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: database-viewer-role
+rules:
+- apiGroups:
+  - k8s.dolthub.com
+  resources:
+  - databases
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - k8s.dolthub.com
+  resources:
+  - databases/status
+  verbs:
+  - get

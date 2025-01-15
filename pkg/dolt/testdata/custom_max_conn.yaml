@@ -1,0 +1,12 @@
+test-cluster-0.yaml:
+  log_level: trace
+  cluster:
+    bootstrap_epoch: 1
+    bootstrap_role: primary
+    standby_remotes: []
+    remotesapi:
+      port: 50051
+  listener:
+    host: 0.0.0.0
+    max_connections: 200
+    port: 3306

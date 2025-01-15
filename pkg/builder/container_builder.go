@@ -21,6 +21,9 @@ const (
 
 	DoltDataMountPath   = "/db"
 	DoltConfigMountPath = "/etc/doltdb"
+
+	DefaultProbePeriodSeconds       = 40
+	DefaultProbeInitialDelaySeconds = 15
 )
 
 func doltVolumeMounts() []corev1.VolumeMount {
@@ -93,8 +96,8 @@ func doltContainers(doltdb *doltv1alpha.DoltDB) []corev1.Container {
 				},
 			},
 			VolumeMounts:   doltVolumeMounts(),
-			ReadinessProbe: doltReadinessProbe(),
-			LivenessProbe:  doltLivenessProbe(),
+			ReadinessProbe: doltReadinessProbe(doltdb.Spec.Probes.ReadinessProbe),
+			LivenessProbe:  doltLivenessProbe(doltdb.Spec.Probes.LivenessProbe),
 		},
 	}
 
@@ -144,7 +147,13 @@ func doltResourceRequirements(doltdb *doltv1alpha.DoltDB) corev1.ResourceRequire
 	}
 }
 
-func doltReadinessProbe() *corev1.Probe {
+func doltReadinessProbe(probe *corev1.Probe) *corev1.Probe {
+	if probe == nil {
+		probe = &corev1.Probe{
+			InitialDelaySeconds: DefaultProbeInitialDelaySeconds,
+			PeriodSeconds:       DefaultProbePeriodSeconds,
+		}
+	}
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
@@ -155,12 +164,23 @@ func doltReadinessProbe() *corev1.Probe {
 				},
 			},
 		},
-		InitialDelaySeconds: 15,
-		PeriodSeconds:       10,
+		InitialDelaySeconds:           probe.InitialDelaySeconds,
+		PeriodSeconds:                 probe.PeriodSeconds,
+		TimeoutSeconds:                probe.TimeoutSeconds,
+		SuccessThreshold:              probe.SuccessThreshold,
+		FailureThreshold:              probe.FailureThreshold,
+		TerminationGracePeriodSeconds: probe.TerminationGracePeriodSeconds,
 	}
 }
 
-func doltLivenessProbe() *corev1.Probe {
+func doltLivenessProbe(probe *corev1.Probe) *corev1.Probe {
+	if probe == nil {
+		probe = &corev1.Probe{
+			InitialDelaySeconds: DefaultProbeInitialDelaySeconds,
+			PeriodSeconds:       DefaultProbePeriodSeconds,
+		}
+	}
+
 	return &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			Exec: &corev1.ExecAction{
@@ -171,7 +191,11 @@ func doltLivenessProbe() *corev1.Probe {
 				},
 			},
 		},
-		InitialDelaySeconds: 20,
-		PeriodSeconds:       10,
+		InitialDelaySeconds:           probe.InitialDelaySeconds,
+		PeriodSeconds:                 probe.PeriodSeconds,
+		TimeoutSeconds:                probe.TimeoutSeconds,
+		SuccessThreshold:              probe.SuccessThreshold,
+		FailureThreshold:              probe.FailureThreshold,
+		TerminationGracePeriodSeconds: probe.TerminationGracePeriodSeconds,
 	}
 }

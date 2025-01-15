@@ -96,7 +96,7 @@ func TestSetReadyWithDoltCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &MockConditioner{}
-			SetReadyWithDoltCluster(m, tt.sts, tt.doltdb)
+			SetReadyWithDoltDB(m, tt.sts, tt.doltdb)
 
 			if len(m.conditions) != 1 {
 				t.Fatalf("expected 1 condition, got %d", len(m.conditions))

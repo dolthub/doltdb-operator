@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	doltv1alpha1 "github.com/electronicarts/doltdb-operator/api/v1alpha"
+	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
 	"github.com/electronicarts/doltdb-operator/pkg/statefulset"
 	corev1 "k8s.io/api/core/v1"
@@ -25,9 +25,9 @@ func New(client client.Client) *RefResolver {
 	}
 }
 
-// DoltDB retrieves a DoltDB resource based on the provided DoltClusterRef and namespace.
-func (r *RefResolver) DoltDB(ctx context.Context, ref *doltv1alpha1.DoltClusterRef,
-	namespace string) (*doltv1alpha1.DoltDB, error) {
+// DoltDB retrieves a DoltDB resource based on the provided DoltDBRef and namespace.
+func (r *RefResolver) DoltDB(ctx context.Context, ref *doltv1alpha.DoltDBRef,
+	namespace string) (*doltv1alpha.DoltDB, error) {
 	key := types.NamespacedName{
 		Name:      ref.Name,
 		Namespace: namespace,
@@ -36,7 +36,7 @@ func (r *RefResolver) DoltDB(ctx context.Context, ref *doltv1alpha1.DoltClusterR
 		key.Namespace = ref.Namespace
 	}
 
-	var doltdb doltv1alpha1.DoltDB
+	var doltdb doltv1alpha.DoltDB
 	if err := r.client.Get(ctx, key, &doltdb); err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (r *RefResolver) DoltDB(ctx context.Context, ref *doltv1alpha1.DoltClusterR
 }
 
 // DoltDBPodRef retrieves a Pod resource based on the provided DoltDB and podIndex.
-func (r *RefResolver) DoltDBPodRef(ctx context.Context, doltdb *doltv1alpha1.DoltDB, index int) (*corev1.Pod, error) {
+func (r *RefResolver) DoltDBPodRef(ctx context.Context, doltdb *doltv1alpha.DoltDB, index int) (*corev1.Pod, error) {
 	key := types.NamespacedName{
 		Name:      statefulset.PodName(doltdb.ObjectMeta, index),
 		Namespace: doltdb.Namespace,
@@ -57,13 +57,13 @@ func (r *RefResolver) DoltDBPodRef(ctx context.Context, doltdb *doltv1alpha1.Dol
 }
 
 // DoltDBFromAnnotation retrieves a DoltDB resource based on the annotation in the provided ObjectMeta.
-func (r *RefResolver) DoltDBFromAnnotation(ctx context.Context, objMeta metav1.ObjectMeta) (*doltv1alpha1.DoltDB, error) {
+func (r *RefResolver) DoltDBFromAnnotation(ctx context.Context, objMeta metav1.ObjectMeta) (*doltv1alpha.DoltDB, error) {
 	doltdbAnnotation, ok := objMeta.Annotations[dolt.Annotation]
 	if !ok {
 		return nil, ErrDoltClusterAnnotationNotFound
 	}
 
-	var doltdb doltv1alpha1.DoltDB
+	var doltdb doltv1alpha.DoltDB
 	key := types.NamespacedName{
 		Name:      doltdbAnnotation,
 		Namespace: objMeta.Namespace,
@@ -78,7 +78,7 @@ func (r *RefResolver) DoltDBFromAnnotation(ctx context.Context, objMeta metav1.O
 }
 
 // SecretKeyRef retrieves the value of a specific key from a Secret resource based on the provided SecretKeySelector and namespace.
-func (r *RefResolver) SecretKeyRef(ctx context.Context, selector doltv1alpha1.SecretKeySelector,
+func (r *RefResolver) SecretKeyRef(ctx context.Context, selector doltv1alpha.SecretKeySelector,
 	namespace string) (string, error) {
 	key := types.NamespacedName{
 		Name:      selector.Name,
@@ -97,7 +97,7 @@ func (r *RefResolver) SecretKeyRef(ctx context.Context, selector doltv1alpha1.Se
 }
 
 // ConfigMapKeyRef retrieves the value of a specific key from a ConfigMap resource based on the provided ConfigMapKeySelector and namespace.
-func (r *RefResolver) ConfigMapKeyRef(ctx context.Context, selector *doltv1alpha1.ConfigMapKeySelector,
+func (r *RefResolver) ConfigMapKeyRef(ctx context.Context, selector *doltv1alpha.ConfigMapKeySelector,
 	namespace string) (string, error) {
 	key := types.NamespacedName{
 		Name:      selector.Name,

@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -36,11 +37,14 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
+
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/internal/controller"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
 	"github.com/electronicarts/doltdb-operator/pkg/conditions"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/configmap"
+	"github.com/electronicarts/doltdb-operator/pkg/controller/database"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/rbac"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/replication"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/service"
@@ -49,7 +53,6 @@ import (
 	"github.com/electronicarts/doltdb-operator/pkg/controller/storage"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
 	"github.com/electronicarts/doltdb-operator/pkg/refresolver"
-	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -73,6 +76,9 @@ func main() {
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
 	var maxConcurrentReconciles int
+	var logDevMode bool
+	var logSql bool
+	var requeueSql time.Duration
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -86,9 +92,12 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 1,
 		"Global maximum number of concurrent reconciles per resource.")
+	flag.BoolVar(&logDevMode, "log-dev-mode", true, "Enable development logs.")
+	flag.BoolVar(&logSql, "log-sql", false, "Enable SQL resource logs.")
+	flag.DurationVar(&requeueSql, "requeue-sql", 30*time.Second, "The interval at which SQL objects are requeued.")
 
 	opts := zap.Options{
-		Development: true,
+		Development: logDevMode,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -220,6 +229,16 @@ func main() {
 
 	if err = podReplicationController.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "PodReplication")
+		os.Exit(1)
+	}
+
+	sqlOpts := []database.SqlOpt{
+		database.WithRequeueInterval(requeueSql),
+		database.WithLogSql(logSql),
+	}
+	if err = controller.NewDatabaseReconciler(client, refResolver, conditionReady, sqlOpts...).
+		SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Unable to create controller", "controller", "Database")
 		os.Exit(1)
 	}
 

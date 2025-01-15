@@ -1,4 +1,7 @@
-# GitLab CI yaml reference: https://docs.gitlab.com/ee/ci/yaml/index.html
+include:
+  - project: "REDACTED"
+    ref: main
+    file: "docker.yml"
 
 # This is a sub-project and will be triggered as a child pipeline from the root .gitlab-ci.yml.
 # Variables are declared in the root .gitlab-ci.yml.
@@ -6,32 +9,27 @@ workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
 
-
-.make:
-  image: $DOCKER_HUB_PROXY/docker:$DOCKER_VERSION-dind
-  services:
-    - name: $DOCKER_HUB_PROXY/docker:$DOCKER_VERSION-dind
-      alias: docker
-  variables:
-    DOCKER_HOST: tcp://localhost:2376
-    DOCKER_TLS_CERTDIR: "/certs"
-    DOCKER_TLS_VERIFY: 1
-    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
-  tags:
-    - glaas-shared-k8s-dind
-  retry: 2 # The DinD runners frequently run into errors.
+unit-tests:
+  stage: test
+  interruptible: true
+  image: ${DOCKER_HUB_PROXY}/golang:${GOLANG_VERSION}-alpine
   before_script:
-    - apk add --no-cache curl bash make git kubectl
-    - make go-ci
+    - apk add --no-cache bash make build-base
+  script:
+    - make test
+
+integration-tests:
+  stage: test
+  extends: .dind
+  retry: 2 # The DinD runners frequently run into errors.
+  timeout: 20m
+  interruptible: true
+  before_script:
+    - apk add --no-cache curl bash make git kubectl build-base
+    - make install-go-ci
     - export PATH=${PATH}:/usr/local/go/bin
-    - make kind
-    - make tilt-ci
-    - make cluster-ci
-    - make cluster-ctx
-    - make kustomize-ci
-test:
-  extends: .make
-  script: make tiltci
+  script: 
+    - make integration-tests-ci
 
 lint:
   stage: test
@@ -46,3 +44,4 @@ lint:
       codequality: gl-code-quality-report.json
     expire_in: 1 month
   allow_failure: true
+  interruptible: true

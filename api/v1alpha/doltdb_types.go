@@ -29,82 +29,71 @@ import (
 type DoltDBSpec struct {
 	// EngineVersion defines the version of the Dolt DB server to use.
 	EngineVersion string `json:"engineVersion"`
-
-	// ServiceAccountName defines the service account for the operator
+	// ServiceAccountName defines the service account for the operator.
 	// +optional
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
-
+	// Image specifies the container image name for the Dolt DB server.
 	// +kubebuilder:default:="dolthub/dolt"
-
-	// Image specifies the container image name.
 	// +optional
 	Image string `json:"image,omitempty"`
-
+	// ImagePullSecrets specifies the secrets to use for pulling the container image.
 	// +optional
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-
+	// PodSecurityContext defines the security context for the pod.
 	// +optional
 	PodSecurityContext v1.PodSecurityContext `json:"securityContext,omitempty"`
-
+	// Affinity defines the affinity rules for the pod.
 	// +optional
 	Affinity *v1.Affinity `json:"affinity,omitempty"`
-
+	// Tolerations defines the tolerations for the pod.
 	// +optional
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
-
+	// NodeSelector defines the node selector for the pod.
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
 	// PodDisruptionBudget defines the budget for replica availability.
 	// +optional
 	PodDisruptionBudget *PodDisruptionBudget `json:"podDisruptionBudget,omitempty"`
-
+	// Resources defines the resource requirements for the pod.
 	// +optional
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
-
-	// Volume defines the volume configuration for the Dolt cluster.
+	// Storage defines the volume configuration for the Dolt cluster.
 	Storage Storage `json:"storage"`
-
+	// Replicas specifies the number of replicas for the Dolt cluster.
 	// +kubebuilder:validation:Minimum=2
-
-	// Specifies the number of replicas for the Dolt cluster.
 	// +optional
 	Replicas int32 `json:"replicas"`
-
+	// MaxConnections specifies the maximum number of connections for the Dolt cluster.
+	// Default is 128 connections.
 	// +kubebuilder:validation:Minimum=10
 	// +kubebuilder:default:=128
-
-	// Specifies the number of replicas for the Dolt cluster.
-	// Default will be 128 connetions.
 	// +optional
 	MaxConnections *int32 `json:"maxConnections,omitempty"`
-
-	// +kubebuilder:validation:Enum=DirectStandby;Remote
-	// +kubebuilder:default:="DirectStandby"
-
-	// Specifies the type of the Dolt cluster. Valid values are:
+	// ReplicationStrategy specifies the type of replication for the Dolt cluster.
+	// Valid values are:
 	//  - DirectStandby (default): Direct-to-standby replication
 	//  - Remote: Remote-based replication
+	// +kubebuilder:validation:Enum=DirectStandby;Remote
+	// +kubebuilder:default:="DirectStandby"
 	// +optional
 	ReplicationStrategy ClusterType `json:"replicationStrategy,omitempty"`
-
+	// AutoMinorVersionUpgrade enables or disables automatic minor version upgrades.
 	// +kubebuilder:default:=false
-
-	// AutoMinorVersionUpgrade
-	// Enable or disable auto_minor_version_upgrade
 	// +optional
 	AutoMinorVersionUpgrade *bool `json:"autoMinorVersionUpgrade,omitempty"`
-
 	// UpdateStrategy defines the update strategy for the StatefulSet object.
 	// +optional
 	UpdateStrategy *appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
-
-	// Replication configures high availability via replication. This feature is still in alpha, use Galera if you are looking for a more production-ready HA.
+	// Replication configures high availability via replication.
+	// This feature is still in alpha; use Galera for a more production-ready HA solution.
 	// +optional
 	Replication *Replication `json:"replication,omitempty"`
-
+	// TopologySpreadConstraints defines the topology spread constraints for the pod.
 	// +optional
 	TopologySpreadConstrains []v1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+	// Probes defines the liveness and readiness probes for the DoltDB pods.
+	// +optional
+	Probes Probes `json:"probes"`
 }
 
 // PodDisruptionBudget is the Pod availability bundget for a DoltDB
@@ -118,36 +107,42 @@ type PodDisruptionBudget struct {
 }
 
 // Volume defines a single volume in the manifest.
+// Storage defines the volume configuration for the Dolt cluster.
 type Storage struct {
-	// +kubebuilder:default:="100Gi"
-
 	// Size specifies the size of the volume for the Dolt Cluster.
+	// +kubebuilder:default:="100Gi"
+	// +optional
 	Size *resource.Quantity `json:"size,omitempty"`
-
-	// Storage class defines the storage class for the volume,
-	// otherwise k8s cluster default will be used.
+	// StorageClassName defines the storage class for the volume.
+	// If not specified, the default storage class of the Kubernetes cluster will be used.
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty"`
-
+	// ResizeInUseVolumes indicates whether the PersistentVolumeClaims (PVCs) can be resized while in use.
+	// The StorageClass used should have 'allowVolumeExpansion' set to 'true' to allow resizing.
 	// +kubebuilder:default:=true
-
-	// ResizeInUseVolumes indicates whether the PVCs can be resized.
-	// The 'StorageClassName' used should have 'allowVolumeExpansion' set to 'true' to allow resizing.
 	// +optional
 	ResizeInUseVolumes *bool `json:"resizeInUseVolumes,omitempty"`
-
-	// +kubebuilder:default:=true
-
 	// WaitForVolumeResize indicates whether to wait for the PVCs to be resized before marking the DoltDB object as ready.
 	// This will block other operations such as cluster recovery while the resize is in progress.
-	// It defaults to true.
+	// Defaults to true.
+	// +kubebuilder:default:=true
 	// +optional
 	WaitForVolumeResize *bool `json:"waitForVolumeResize,omitempty"`
-
+	// RetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates.
 	// +optional
-	// StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
-	// created from the StatefulSet VolumeClaimTemplates.
 	RetentionPolicy *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy `json:"retentionPolicy,omitempty"`
+}
+
+// Probes defines the liveness and readiness probes for the DoltDB pods.
+type Probes struct {
+	// LivenessProbe defines the liveness probe for the pod.
+	// +kubebuilder:default:={initialDelaySeconds: 15, periodSeconds: 40}
+	// +optional
+	LivenessProbe *v1.Probe `json:"livenessProbe,omitempty"`
+	// ReadinessProbe defines the readiness probe for the pod.
+	// +kubebuilder:default:={initialDelaySeconds: 15, periodSeconds: 40}
+	// +optional
+	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty"`
 }
 
 // ClusterType defines the type of the Dolt cluster. It can be either

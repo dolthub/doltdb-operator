@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"sync"
 
-	doltv1alpha1 "github.com/electronicarts/doltdb-operator/api/v1alpha"
+	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/refresolver"
 )
 
 type ClientSet struct {
-	DoltDB        *doltv1alpha1.DoltDB
+	DoltDB        *doltv1alpha.DoltDB
 	refResolver   *refresolver.RefResolver
 	clientByIndex map[int]*Client
 	mux           *sync.Mutex
 }
 
 // NewClientSet creates a new ClientSet instance.
-func NewClientSet(doltdb *doltv1alpha1.DoltDB, refResolver *refresolver.RefResolver) *ClientSet {
+func NewClientSet(doltdb *doltv1alpha.DoltDB, refResolver *refresolver.RefResolver) *ClientSet {
 	return &ClientSet{
 		DoltDB:        doltdb,
 		refResolver:   refResolver,

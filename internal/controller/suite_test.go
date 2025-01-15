@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -37,6 +38,7 @@ import (
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
 	"github.com/electronicarts/doltdb-operator/pkg/conditions"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/configmap"
+	"github.com/electronicarts/doltdb-operator/pkg/controller/database"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/rbac"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/replication"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/service"
@@ -62,7 +64,7 @@ var (
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "DoltDB Controller Suite")
+	RunSpecs(t, "DoltDB Controllers Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -158,6 +160,15 @@ var _ = BeforeSuite(func() {
 		StatefulSetReconciler: statefulSetReconciler,
 		ReplicationReconciler: replicationReconciler,
 	}).SetupWithManager(k8sManager, ctrlcontroller.Options{MaxConcurrentReconciles: 10})
+	Expect(err).ToNot(HaveOccurred())
+
+	err = NewDatabaseReconciler(
+		k8sClient,
+		refResolver,
+		conditionReady,
+		database.WithRequeueInterval(30*time.Second),
+		database.WithLogSql(false),
+	).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = podReconciler.SetupWithManager(k8sManager)

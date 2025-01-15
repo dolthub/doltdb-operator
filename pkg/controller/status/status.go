@@ -68,7 +68,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, doltdb *doltv1alpha.DoltDB) 
 		if err := r.setUpdatedCondition(ctx, doltdb); err != nil {
 			log.FromContext(ctx).V(1).Info("error setting DoltDB updated condition", "err", err)
 		}
-		conditions.SetReadyWithDoltCluster(&doltdb.Status, &sts, doltdb)
+		conditions.SetReadyWithDoltDB(&doltdb.Status, &sts, doltdb)
 		return nil
 	})
 }
@@ -148,6 +148,7 @@ func (r *Reconciler) getReplicationStatusAndEpoch(ctx context.Context,
 			continue
 		}
 		if !healthy {
+			logger.V(1).Info("dolt replica is unhealthy", "pod", podName)
 			continue
 		}
 

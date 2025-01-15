@@ -26,11 +26,11 @@ cluster-ctx: ## Sets cluster context.
 
 .PHONY: test-int
 test-int: ## Run tests.
-	go test ./internal/controller/... -v -ginkgo.v --coverprofile=cover.out --timeout 10m
+	go test ./internal/controller/... -v -ginkgo.v --coverprofile=cover.out --timeout 30m
 
 .PHONY: test
 test: ## Run tests.
-	go test $$(go list ./...| grep -v /internal/controller) -race -coverprofile cover.out
+	CGO_ENABLED=1 go test $$(go list ./...| grep -v /internal/controller) -race -coverprofile cover.out
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
@@ -42,7 +42,9 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." \
 		output:crd:artifacts:config=config/crd/bases \
 		output:rbac:artifacts:config=config/rbac \
-		output:webhook:artifacts:config=config/webhook \
+		output:webhook:artifacts:config=config/webhook
+
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." \
 		output:crd:artifacts:config=charts/dolt-operator/generated/crd \
 		output:rbac:artifacts:config=charts/dolt-operator/generated/rbac \
 		output:webhook:artifacts:config=charts/dolt-operator/generated/webhook
@@ -67,8 +69,14 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
+.PHONY: tiltdev
 tiltdev: cluster-ctx
 	tilt up
 
+.PHONY: tiltci
 tiltci: cluster-ctx
 	tilt ci
+
+.PHONY: integration-tests-ci
+integration-tests-ci: kind install-tilt-ci install-kustomize-ci cluster-ci cluster-ctx
+	tilt ci	

@@ -1,0 +1,21 @@
+apiVersion: k8s.dolthub.com/v1alpha
+kind: Database
+metadata:
+  labels:
+    app.kubernetes.io/name: dolt-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: database-sample
+spec:
+  name: demo
+  doltDBRef:
+    waitForIt: true
+    name: demo-doltdb
+    namespace: default
+  systemBranches:
+    - master
+    - global
+  doltIgnorePatterns: []
+  requeueInterval: 10s
+  retryInterval: 10s
+  cleanupPolicy: Skip
+

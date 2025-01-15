@@ -51,8 +51,12 @@ func generateStandbyRemotes(current int, doltdb *doltv1alpha.DoltDB) []StandbyRe
 	for i := 0; i < int(doltdb.Spec.Replicas); i++ {
 		if i != current {
 			remotes = append(remotes, StandbyRemote{
-				Name:              fmt.Sprintf("%s-%d", doltdb.Name, i),
-				RemoteURLTemplate: fmt.Sprintf("http://%s:%d/{database}", statefulset.PodShortFQDNWithServiceAndNamespace(doltdb.ObjectMeta, i, doltdb.InternalServiceKey().Name), RemotesAPIPort),
+				Name: fmt.Sprintf("%s-%d", doltdb.Name, i),
+				RemoteURLTemplate: fmt.Sprintf(
+					"http://%s:%d/{database}",
+					statefulset.PodShortFQDNWithServiceAndNamespace(doltdb.ObjectMeta, i, doltdb.InternalServiceKey().Name),
+					RemotesAPIPort,
+				),
 			})
 		}
 	}
