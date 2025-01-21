@@ -34,7 +34,10 @@ import (
 
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 
+	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
+
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
+	k8sdolthubcomv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
 	"github.com/electronicarts/doltdb-operator/pkg/conditions"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/configmap"
@@ -47,7 +50,6 @@ import (
 	"github.com/electronicarts/doltdb-operator/pkg/controller/storage"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
 	"github.com/electronicarts/doltdb-operator/pkg/refresolver"
-	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -87,6 +89,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 	err = doltv1alpha.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sdolthubcomv1alpha.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
@@ -169,6 +174,24 @@ var _ = BeforeSuite(func() {
 		database.WithRequeueInterval(30*time.Second),
 		database.WithLogSql(false),
 	).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = NewUserReconciler(
+		k8sClient,
+		refResolver,
+		conditionReady,
+		database.WithRequeueInterval(30*time.Second),
+		database.WithLogSql(false),
+	).SetupWithManager(ctx, k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = NewGrantReconciler(
+		k8sClient,
+		refResolver,
+		conditionReady,
+		database.WithRequeueInterval(30*time.Second),
+		database.WithLogSql(false),
+	).SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = podReconciler.SetupWithManager(k8sManager)

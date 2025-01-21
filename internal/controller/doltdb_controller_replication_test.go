@@ -104,11 +104,11 @@ var _ = Describe("DoltDB Replication Controller", Ordered, func() {
 				Probes: doltv1alpha.Probes{
 					LivenessProbe: &corev1.Probe{
 						InitialDelaySeconds: 15,
-						PeriodSeconds:       15,
+						PeriodSeconds:       20,
 					},
 					ReadinessProbe: &corev1.Probe{
 						InitialDelaySeconds: 15,
-						PeriodSeconds:       15,
+						PeriodSeconds:       20,
 					},
 				},
 			},

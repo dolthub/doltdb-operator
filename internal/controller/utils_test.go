@@ -11,6 +11,8 @@ import (
 
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
+	"github.com/electronicarts/doltdb-operator/pkg/dolt"
+	"github.com/electronicarts/doltdb-operator/pkg/dolt/sql"
 	"github.com/electronicarts/doltdb-operator/pkg/statefulset"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -42,29 +44,16 @@ var (
 		Name:      "dolt-database-create-test",
 		Namespace: testDoltKey.Namespace,
 	}
+
+	testDoltAppUserPwdKey = types.NamespacedName{
+		Name:      "dolt-app-user",
+		Namespace: testDoltKey.Namespace,
+	}
+	testDoltAppUserPwdSecretKey = "dolt-user-secret-key"
 )
 
 func testCreateInitialData(ctx context.Context) {
-	secret := v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testDoltCredentialsKey.Name,
-			Namespace: testDoltCredentialsKey.Namespace,
-		},
-		Type: "Opaque",
-		StringData: map[string]string{
-			"admin-user":     "root",
-			"admin-password": "12345",
-		},
-	}
-
-	err := k8sClient.Delete(ctx, &secret)
-	if err != nil {
-		if err != client.IgnoreNotFound(err) {
-			log.FromContext(ctx).Error(err, "error cleaning test environment doltdb secret")
-		}
-	}
-
-	Expect(k8sClient.Create(ctx, &secret)).To(Succeed())
+	createDefaultDoltUsers(ctx)
 
 	doltdb := doltv1alpha.DoltDB{
 		ObjectMeta: metav1.ObjectMeta{
@@ -131,6 +120,11 @@ func testCreateInitialData(ctx context.Context) {
 }
 
 func testCleanupInitialData(ctx context.Context) {
+	By("Deleting App user Secret")
+	var doltAppUserSecret v1.Secret
+	Expect(k8sClient.Get(ctx, testDoltAppUserPwdKey, &doltAppUserSecret)).To(Succeed())
+	Expect(k8sClient.Delete(ctx, &doltAppUserSecret)).To(Succeed())
+
 	deleteDoltDB(ctx, testDoltKey, testDoltCredentialsKey)
 }
 
@@ -141,6 +135,48 @@ func expectReady(ctx context.Context, k8sClient client.Client, key types.Namespa
 	})
 }
 
+func createDefaultDoltUsers(ctx context.Context) {
+	By("Creating Admin user Secret")
+	root := v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testDoltCredentialsKey.Name,
+			Namespace: testDoltCredentialsKey.Namespace,
+		},
+		Type: "Opaque",
+		StringData: map[string]string{
+			"admin-user":     "root",
+			"admin-password": "12345",
+		},
+	}
+	if err := k8sClient.Delete(ctx, &root); err != nil {
+		if err != client.IgnoreNotFound(err) {
+			log.FromContext(ctx).Error(err, "error cleaning test environment doltdb secret")
+		}
+	}
+	Expect(k8sClient.Create(ctx, &root)).To(Succeed())
+
+	By("Creating App user Secret")
+	defaultAppUser := v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testDoltAppUserPwdKey.Name,
+			Namespace: testDoltAppUserPwdKey.Namespace,
+			Labels: map[string]string{
+				dolt.WatchLabel: "true",
+			},
+		},
+		Type: "Opaque",
+		StringData: map[string]string{
+			testDoltAppUserPwdSecretKey: "dolt!#123",
+		},
+	}
+	if err := k8sClient.Delete(ctx, &defaultAppUser); err != nil {
+		if err != client.IgnoreNotFound(err) {
+			log.FromContext(ctx).Error(err, "error cleaning test environment doltdb secret")
+		}
+	}
+	Expect(k8sClient.Create(ctx, &defaultAppUser)).To(Succeed())
+}
+
 func expectFn(ctx context.Context, k8sClient client.Client, key types.NamespacedName, fn func(doltdb *doltv1alpha.DoltDB) bool) {
 	var doltdb doltv1alpha.DoltDB
 	Eventually(func(g Gomega) bool {
@@ -149,11 +185,11 @@ func expectFn(ctx context.Context, k8sClient client.Client, key types.Namespaced
 	}, testHighTimeout, testInterval).Should(BeTrue())
 }
 
-func deleteDoltDB(ctx context.Context, key types.NamespacedName, secretKey types.NamespacedName) {
-	By("Deleting Secret")
-	var doltSecret v1.Secret
-	Expect(k8sClient.Get(ctx, secretKey, &doltSecret)).To(Succeed())
-	Expect(k8sClient.Delete(ctx, &doltSecret)).To(Succeed())
+func deleteDoltDB(ctx context.Context, key types.NamespacedName, rootUserSecretKey types.NamespacedName) {
+	By("Deleting Admin user Secret")
+	var doltRootSecret v1.Secret
+	Expect(k8sClient.Get(ctx, rootUserSecretKey, &doltRootSecret)).To(Succeed())
+	Expect(k8sClient.Delete(ctx, &doltRootSecret)).To(Succeed())
 
 	var doltdb doltv1alpha.DoltDB
 	By("Deleting DoltDB")
@@ -240,4 +276,27 @@ func testDoltDBUpdate(doltdb *doltv1alpha.DoltDB) {
 		}
 		return doltdb.IsReady() && meta.IsStatusConditionTrue(doltdb.Status.Conditions, doltv1alpha.ConditionTypeUpdated)
 	}, testHighTimeout, testInterval).Should(BeTrue())
+}
+
+func testSQLConnection(ctx context.Context, doltdb *doltv1alpha.DoltDB, username string, pwdSecretKeyRef doltv1alpha.SecretKeySelector) {
+	By("Resolve DoltDB Password secret")
+	password, err := refResolver.SecretKeyRef(ctx, pwdSecretKeyRef, doltdb.Namespace)
+	Expect(err).NotTo(HaveOccurred())
+
+	Eventually(func() bool {
+		By("Checking connection to DoltDB")
+		client, err := sql.NewClientWithDoltDB(
+			ctx,
+			doltdb,
+			refResolver,
+			sql.WithPassword(password),
+			sql.WithUsername(username),
+		)
+		if err != nil {
+			return false
+		}
+		defer client.Close()
+
+		return true
+	}, testTimeout, testInterval).Should(BeTrue())
 }

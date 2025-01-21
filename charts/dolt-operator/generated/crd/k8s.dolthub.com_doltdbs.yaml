@@ -37,9 +37,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: |-
-              DoltDBSpec defines the desired state of DoltDB
-              DoltDBSpec defines the desired state of a Dolt DB cluster.
+            description: DoltDBSpec defines the desired state of DoltDB
             properties:
               affinity:
                 description: Affinity defines the affinity rules for the pod.

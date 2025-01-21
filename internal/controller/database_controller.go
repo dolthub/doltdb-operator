@@ -74,12 +74,12 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log.WithValues("namespace", req.NamespacedName, "database", db.Spec.Name).
 		Info("Running reconciler for Database")
 
-	wr := newWrappedDatabaseReconciler(r.Client, r.RefResolver, &db)
-	wf := newWrappedDatabaseFinalizer(r.Client, &db)
-	tf := database.NewSqlFinalizer(r.Client, wf, r.SqlOpts...)
-	tr := database.NewSqlReconciler(r.Client, r.ConditionReady, wr, tf, r.SqlOpts...)
+	dbReconciler := newWrappedDatabaseReconciler(r.Client, r.RefResolver, &db)
+	dbFinalizer := newWrappedDatabaseFinalizer(r.Client, &db)
+	finalizerCtrl := database.NewSqlFinalizer(r.Client, dbFinalizer, r.SqlOpts...)
+	dbCtrl := database.NewSqlReconciler(r.Client, r.ConditionReady, dbReconciler, finalizerCtrl, r.SqlOpts...)
 
-	result, err := tr.Reconcile(ctx, &db)
+	result, err := dbCtrl.Reconcile(ctx, &db)
 	if err != nil {
 		return result, fmt.Errorf("error reconciling in TemplateReconciler: %v", err)
 	}
@@ -108,7 +108,7 @@ func newWrappedDatabaseReconciler(client client.Client, refResolver *refresolver
 	}
 }
 
-func (wr *wrappedDatabaseReconciler) Reconcile(ctx context.Context, doltdbClient *sql.Client, doltdb *doltv1alpha.DoltDB) error {
+func (wr *wrappedDatabaseReconciler) Reconcile(ctx context.Context, doltdbClient *sql.Client) error {
 	opts := sql.DatabaseOpts{
 		CharSet:   wr.database.Spec.CharSet,
 		Collation: wr.database.Spec.Collation,

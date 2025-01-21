@@ -4,7 +4,7 @@ metadata:
   name: dolt-operator-test-runner-job
 spec:
   parallelism: 1
-  activeDeadlineSeconds: 1200
+  activeDeadlineSeconds: 1600
   ttlSecondsAfterFinished: 100
   template:
     spec:

@@ -25,7 +25,7 @@ type Reconciler interface {
 }
 
 type WrappedReconciler interface {
-	Reconcile(context.Context, *sql.Client, *doltv1alpha.DoltDB) error
+	Reconcile(context.Context, *sql.Client) error
 	PatchStatus(context.Context, conditions.Patcher) error
 }
 

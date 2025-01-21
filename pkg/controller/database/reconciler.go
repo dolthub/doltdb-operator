@@ -116,7 +116,7 @@ func (r *SqlReconciler) Reconcile(ctx context.Context, resource Resource) (ctrl.
 		}
 	}()
 
-	err = r.WrappedReconciler.Reconcile(ctx, doltdbClient, doltdb)
+	err = r.WrappedReconciler.Reconcile(ctx, doltdbClient)
 	var errBundle *multierror.Error
 	errBundle = multierror.Append(errBundle, err)
 

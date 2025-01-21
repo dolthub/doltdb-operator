@@ -1,0 +1,13 @@
+apiVersion: k8s.dolthub.com/v1alpha
+kind: Grant
+metadata:
+  name: sample-grant
+spec:
+  doltDBRef:
+    name: dolt
+    namespace: default
+  privileges: ["ALL"]
+  database: "*"
+  table: "*"
+  username: "sample-user"
+  host: "%"

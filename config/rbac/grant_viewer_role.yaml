@@ -1,0 +1,23 @@
+# permissions for end users to view grants.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: dolt-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: grant-viewer-role
+rules:
+- apiGroups:
+  - k8s.dolthub.com
+  resources:
+  - grants
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - k8s.dolthub.com
+  resources:
+  - grants/status
+  verbs:
+  - get

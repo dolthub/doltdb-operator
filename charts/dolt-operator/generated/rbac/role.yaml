@@ -91,6 +91,8 @@ rules:
   resources:
   - databases
   - doltdbs
+  - grants
+  - users
   verbs:
   - create
   - delete
@@ -104,6 +106,8 @@ rules:
   resources:
   - databases/finalizers
   - doltdbs/finalizers
+  - grants/finalizers
+  - users/finalizers
   verbs:
   - update
 - apiGroups:
@@ -111,6 +115,8 @@ rules:
   resources:
   - databases/status
   - doltdbs/status
+  - grants/status
+  - users/status
   verbs:
   - get
   - patch

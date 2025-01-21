@@ -17,9 +17,12 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -40,6 +43,7 @@ import (
 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
+	k8sdolthubcomv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/internal/controller"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
 	"github.com/electronicarts/doltdb-operator/pkg/conditions"
@@ -65,6 +69,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(doltv1alpha.AddToScheme(scheme))
+	utilruntime.Must(k8sdolthubcomv1alpha.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -103,6 +108,15 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	ctx, cancel := signal.NotifyContext(context.Background(), []os.Signal{
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGKILL,
+		syscall.SIGHUP,
+		syscall.SIGQUIT}...,
+	)
+	defer cancel()
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -239,6 +253,18 @@ func main() {
 	if err = controller.NewDatabaseReconciler(client, refResolver, conditionReady, sqlOpts...).
 		SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "Database")
+		os.Exit(1)
+	}
+
+	if err = controller.NewUserReconciler(client, refResolver, conditionReady, sqlOpts...).
+		SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "Unable to create controller", "controller", "User")
+		os.Exit(1)
+	}
+
+	if err = controller.NewGrantReconciler(client, refResolver, conditionReady, sqlOpts...).
+		SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "Unable to create controller", "controller", "Grant")
 		os.Exit(1)
 	}
 

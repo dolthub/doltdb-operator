@@ -8,7 +8,7 @@ spec:
   image: "dolthub/dolt"
   replicas: 3
   storage:
-    size: "100Gi"
+    size: "10Gi"
   replication:
     enabled: true
     primary: 
