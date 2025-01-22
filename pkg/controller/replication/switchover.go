@@ -11,6 +11,7 @@ import (
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt/sql"
 	"github.com/electronicarts/doltdb-operator/pkg/health"
+	"github.com/electronicarts/doltdb-operator/pkg/metrics"
 	"github.com/electronicarts/doltdb-operator/pkg/statefulset"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -108,6 +109,8 @@ func (r *ReplicationReconciler) reconcileSwitchover(ctx context.Context, req *re
 		status.UpdateCurrentPrimary(req.doltdb, *toIndex)
 		status.UpdateReplicationEpoch(req.doltdb, doltDBCtx.nextEpoch)
 		conditions.SetPrimarySwitched(&req.doltdb.Status)
+		metrics.DoltDBCurrentPrimaryIndex.WithLabelValues(req.doltdb.Name, req.doltdb.Namespace).Set(float64(*toIndex))
+		metrics.DoltDBReplicationSwitchOvers.WithLabelValues(req.doltdb.Name, req.doltdb.Namespace).Inc()
 	}); err != nil {
 		return fmt.Errorf("error patching DoltDB status: %v", err)
 	}

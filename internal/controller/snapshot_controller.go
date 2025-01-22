@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	"github.com/hashicorp/go-multierror"
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
@@ -44,7 +45,7 @@ type SnapshotReconciler struct {
 
 // +kubebuilder:rbac:groups=k8s.dolthub.com,resources=snapshots,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=k8s.dolthub.com,resources=snapshots/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=volumesnapshots,verbs=list;watch;create;patch
+// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;create;update;delete
 // +kubebuilder:rbac:groups=batch,resources=cronjobs/status,verbs=get;update

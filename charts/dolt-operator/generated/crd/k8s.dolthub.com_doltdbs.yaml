@@ -14,7 +14,23 @@ spec:
     singular: doltdb
   scope: Namespaced
   versions:
-  - name: v1alpha
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].message
+      name: Status
+      type: string
+    - jsonPath: .status.currentPrimary
+      name: CurrentPrimary
+      type: string
+    - jsonPath: .status.replicationEpoch
+      name: ReplicationEpoch
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha
     schema:
       openAPIV3Schema:
         description: DoltDB is the Schema for the doltdbs API

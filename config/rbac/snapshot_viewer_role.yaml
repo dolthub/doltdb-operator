@@ -5,7 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/name: dolt-operator
     app.kubernetes.io/managed-by: kustomize
-  name: Snapshot-viewer-role
+  name: snapshot-viewer-role
 rules:
 - apiGroups:
   - REDACTED

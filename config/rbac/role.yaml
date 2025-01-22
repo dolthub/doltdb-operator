@@ -25,13 +25,13 @@ rules:
   - get
   - list
   - update
+  - watch
 - apiGroups:
   - ""
   resources:
   - events
   - serviceaccounts
   - services
-  - volumesnapshots
   verbs:
   - create
   - list
@@ -166,4 +166,16 @@ rules:
   - create
   - list
   - patch
+  - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch

@@ -94,12 +94,15 @@ type reconcilePhaseDoltDB struct {
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterrolebindings,verbs=list;watch;create;patch
 // +kubebuilder:rbac:groups=authorization.k8s.io,resources=subjectaccessreviews,verbs=create
 // +kubebuilder:rbac:groups=authentication.k8s.io,resources=tokenreviews,verbs=create
-// +kubebuilder:rbac:groups="",resources=endpoints,verbs=list;get;create;update;delete
+// +kubebuilder:rbac:groups="",resources=endpoints,verbs=list;get;watch;create;update;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *DoltDBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
+
+	log.WithValues("namespace", req.NamespacedName, "doltdb", req.Name).
+		Info("Running reconciler for DoltDB")
 
 	// Fetch DoltDB CRD in current namespace
 	var doltdb doltv1alpha.DoltDB

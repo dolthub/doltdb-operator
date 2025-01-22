@@ -35,6 +35,9 @@ spec:
         - /manager
         args:
           - --health-probe-bind-address=:8081
+          - --leader-elect
+          - --metrics-bind-address=:8080
+          - --metrics-secure=false
         image: localhost:5000/dolt-operator:local
         name: manager
         securityContext:

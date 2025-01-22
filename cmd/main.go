@@ -25,8 +25,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/electronicarts/doltdb-operator/pkg/controller/volumesnapshot"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -56,6 +54,7 @@ import (
 	"github.com/electronicarts/doltdb-operator/pkg/controller/statefulset"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/status"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/storage"
+	"github.com/electronicarts/doltdb-operator/pkg/controller/volumesnapshot"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
 	"github.com/electronicarts/doltdb-operator/pkg/refresolver"
 	// +kubebuilder:scaffold:imports
@@ -81,6 +80,7 @@ func main() {
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
 	var maxConcurrentReconciles int
+	var maxDoltDBMaxConcurrentReconciles int
 	var logDevMode bool
 	var logSql bool
 	var requeueSql time.Duration
@@ -97,6 +97,8 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 1,
 		"Global maximum number of concurrent reconciles per resource.")
+	flag.IntVar(&maxDoltDBMaxConcurrentReconciles, "max-doltdb-concurrent-reconciles", 10,
+		"DoltDB controller maximum number of concurrent reconciles per resource.")
 	flag.BoolVar(&logDevMode, "log-dev-mode", true, "Enable development logs.")
 	flag.BoolVar(&logSql, "log-sql", false, "Enable SQL resource logs.")
 	flag.DurationVar(&requeueSql, "requeue-sql", 30*time.Second, "The interval at which SQL objects are requeued.")
@@ -237,7 +239,7 @@ func main() {
 		ServiceReconciler:     serviceReconciler,
 		StatefulSetReconciler: statefulSetReconciler,
 		ReplicationReconciler: replicationReconciler,
-	}).SetupWithManager(mgr, ctrlcontroller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}); err != nil {
+	}).SetupWithManager(mgr, ctrlcontroller.Options{MaxConcurrentReconciles: maxDoltDBMaxConcurrentReconciles}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DoltDB")
 		os.Exit(1)
 	}

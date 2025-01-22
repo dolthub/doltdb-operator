@@ -70,7 +70,12 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: tiltdev
-tiltdev: cluster-ctx
+tiltdev:
+	make cluster-ci CLUSTER=doltdev cluster-ctx CLUSTER=doltdev
+	tilt up -f Tiltfile.dev
+
+.PHONY: tilttest
+tilttest: cluster-ctx
 	tilt up
 
 .PHONY: tiltci

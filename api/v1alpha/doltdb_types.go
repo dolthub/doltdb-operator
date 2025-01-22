@@ -202,6 +202,11 @@ type DoltDBStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message"
+// +kubebuilder:printcolumn:name="CurrentPrimary",type="string",JSONPath=".status.currentPrimary"
+// +kubebuilder:printcolumn:name="ReplicationEpoch",type="string",JSONPath=".status.replicationEpoch"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // DoltDB is the Schema for the doltdbs API
 type DoltDB struct {
