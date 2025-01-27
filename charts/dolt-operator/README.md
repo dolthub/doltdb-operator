@@ -19,7 +19,7 @@ A Helm chart for Kubernetes deployment of Dolt operator
 | nameOverride | string | `""` |  |
 | podAnnotations | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
-| replicaCount | int | `1` |  |
+| replicas | int | `1` |  |
 | resources | object | `{}` |  |
 | securityContext | object | `{}` |  |
 | serviceAccount.annotations | object | `{}` |  |

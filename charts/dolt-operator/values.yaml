@@ -1,6 +1,6 @@
 # Default values for dolt-operator.
 
-replicaCount: 1
+replicas: 1
 
 image:
   repository: "%%image_repository%%"
