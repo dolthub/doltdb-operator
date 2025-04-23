@@ -1,4 +1,7 @@
 test-cluster-0.yaml:
+  behavior:
+    auto_gc_behavior:
+      enable: false
   log_level: trace
   cluster:
     bootstrap_epoch: 1
@@ -18,6 +21,9 @@ test-cluster-0.yaml:
       doltdb_instance: doltdb-dev 
     port: 9092
 test-cluster-1.yaml:
+  behavior:
+    auto_gc_behavior:
+      enable: false
   log_level: trace
   cluster:
     bootstrap_epoch: 1

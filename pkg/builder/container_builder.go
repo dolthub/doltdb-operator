@@ -47,8 +47,6 @@ func doltContainerCommand() []string {
 		"sql-server",
 		"--config",
 		"config.yaml",
-		"--data-dir",
-		".",
 	}
 }
 

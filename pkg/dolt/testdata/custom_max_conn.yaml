@@ -1,4 +1,7 @@
 test-cluster-0.yaml:
+  behavior:
+    auto_gc_behavior:
+      enable: false
   log_level: trace
   cluster:
     bootstrap_epoch: 1

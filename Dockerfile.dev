@@ -1,8 +1,12 @@
+
 # Build the manager binary
 FROM docker.io/golang:1.23 AS builder
 
+ARG DOLTDB_ENGINE_VERSION
 ARG TARGETOS
 ARG TARGETARCH
+
+ENV DOLTDB_ENGINE_VERSION=${DOLTDB_ENGINE_VERSION}
 
 RUN apt install bash make
 

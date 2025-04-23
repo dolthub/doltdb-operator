@@ -1,4 +1,7 @@
 test-cluster-0.yaml:
+  behavior:
+    auto_gc_behavior:
+      enable: true
   log_level: trace
   cluster:
     bootstrap_epoch: 1
@@ -13,6 +16,9 @@ test-cluster-0.yaml:
     max_connections: 128
     port: 3306
 test-cluster-1.yaml:
+  behavior:
+    auto_gc_behavior:
+      enable: true
   log_level: trace
   cluster:
     bootstrap_epoch: 1

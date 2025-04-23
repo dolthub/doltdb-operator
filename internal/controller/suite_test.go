@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -59,10 +60,11 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	k8sClient   client.Client
-	ctx         context.Context
-	cancel      context.CancelFunc
-	refResolver *refresolver.RefResolver
+	k8sClient           client.Client
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	refResolver         *refresolver.RefResolver
+	doltdbEngineVersion string
 )
 
 func TestControllers(t *testing.T) {
@@ -77,6 +79,11 @@ var _ = BeforeSuite(func() {
 	log.SetLogger(testLogger)
 
 	ctx, cancel = context.WithCancel(context.TODO())
+
+	doltdbEngineVersion = os.Getenv("DOLTDB_ENGINE_VERSION")
+	Expect(doltdbEngineVersion).NotTo(BeEmpty(), "DOLTDB_ENGINE_VERSION must be set")
+
+	testLogger.Info("DOLTDB_ENGINE_VERSION", "version", doltdbEngineVersion)
 
 	var err error
 

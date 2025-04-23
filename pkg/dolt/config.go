@@ -15,10 +15,19 @@ const (
 
 // Config represents the structure of the configuration data.
 type Config struct {
+	Behavior Behavior `yaml:"behavior"`
 	LogLevel string   `yaml:"log_level"`
 	Cluster  Cluster  `yaml:"cluster"`
 	Listener Listener `yaml:"listener"`
 	Metrics  Metrics  `yaml:"metrics,omitempty"`
+}
+
+type Behavior struct {
+	AutoGCBehavior AutoGCBehavior `yaml:"auto_gc_behavior"`
+}
+
+type AutoGCBehavior struct {
+	Enable bool `yaml:"enable"`
 }
 
 // Metrics represents the metrics section of the configuration.

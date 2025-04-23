@@ -3,6 +3,9 @@
 CLUSTER ?= dolt
 KIND_CONFIG ?= hack/manifests/kind/kind.yaml
 
+ENV ?= \
+	DOLTDB_ENGINE_VERSION=$(DOLTDB_ENGINE_VERSION)
+
 .PHONY: cluster
 cluster:
 	$(KIND) create cluster --name $(CLUSTER) --config $(KIND_CONFIG)
@@ -26,7 +29,7 @@ cluster-ctx: ## Sets cluster context.
 
 .PHONY: test-int
 test-int: ## Run tests.
-	go test ./internal/controller/... -v -ginkgo.v --coverprofile=cover.out --timeout 30m
+	$(ENV) go test ./internal/controller/... -v -ginkgo.v --coverprofile=cover.out --timeout 30m
 
 .PHONY: test
 test: ## Run tests.

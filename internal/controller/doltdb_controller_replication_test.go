@@ -72,7 +72,7 @@ var _ = Describe("DoltDB Replication Controller", Ordered, func() {
 			},
 			Spec: doltv1alpha.DoltDBSpec{
 				Image:               "dolthub/dolt",
-				EngineVersion:       "1.45.1",
+				EngineVersion:       doltdbEngineVersion,
 				Replicas:            3,
 				ReplicationStrategy: doltv1alpha.DirectStandby,
 				Storage: doltv1alpha.Storage{

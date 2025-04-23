@@ -1682,6 +1682,20 @@ spec:
                 description: Server defines the server configuration for the DoltDB
                   server.
                 properties:
+                  behavior:
+                    description: Behavior defines the behavior configuration for the
+                      DoltDB server.
+                    properties:
+                      autoGCBehavior:
+                        description: AutoGCBehavior defines the auto GC behavior for
+                          the DoltDB server.
+                        properties:
+                          enabled:
+                            default: false
+                            description: Enable is a flag to enable the auto GC behavior.
+                            type: boolean
+                        type: object
+                    type: object
                   cluster:
                     description: Cluster defines the cluster configuration for the
                       DoltDB server.

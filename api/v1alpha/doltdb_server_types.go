@@ -1,6 +1,9 @@
 package v1alpha
 
 type Server struct {
+	// Behavior defines the behavior configuration for the DoltDB server.
+	// +optional
+	Behavior `json:"behavior,omitempty"`
 	// LogLevel defines the logging level for the DoltDB server.
 	// +kubebuilder:default:="trace"
 	// +optional
@@ -14,6 +17,20 @@ type Server struct {
 	// Cluster defines the cluster configuration for the DoltDB server.
 	// +optional
 	Cluster Cluster `json:"cluster,omitempty"`
+}
+
+// Behavior defines the behavior configuration for the DoltDB server.
+type Behavior struct {
+	// AutoGCBehavior defines the auto GC behavior for the DoltDB server.
+	// +optional
+	AutoGCBehavior AutoGCBehavior `json:"autoGCBehavior,omitempty"`
+}
+
+type AutoGCBehavior struct {
+	// Enable is a flag to enable the auto GC behavior.
+	// +kubebuilder:default:=false
+	// +optional
+	Enable bool `json:"enabled,omitempty"`
 }
 
 // Metrics defines the metrics configuration for the DoltDB server.

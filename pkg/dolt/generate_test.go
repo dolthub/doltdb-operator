@@ -28,6 +28,11 @@ func TestGenerateConfigMapData(t *testing.T) {
 				Spec: doltv1alpha.DoltDBSpec{
 					Replicas: 2,
 					Server: doltv1alpha.Server{
+						Behavior: doltv1alpha.Behavior{
+							AutoGCBehavior: doltv1alpha.AutoGCBehavior{
+								Enable: true,
+							},
+						},
 						Listener: doltv1alpha.Listener{
 							Host:           "0.0.0.0",
 							Port:           3306,

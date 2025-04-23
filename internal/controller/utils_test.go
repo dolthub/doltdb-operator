@@ -73,7 +73,7 @@ func testCreateInitialData(ctx context.Context) {
 		},
 		Spec: doltv1alpha.DoltDBSpec{
 			Image:               "dolthub/dolt",
-			EngineVersion:       "1.45.1",
+			EngineVersion:       doltdbEngineVersion,
 			Replicas:            2,
 			ReplicationStrategy: doltv1alpha.DirectStandby,
 			Storage: doltv1alpha.Storage{

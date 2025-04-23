@@ -14,7 +14,11 @@ local_resource('Generate CRDs', cmd='make generate', deps=['Makefile', 'make/*',
 local_resource('Install CRDs', cmd='make install', deps=['Makefile', 'make/*', 'api/*'])
 
 
-docker_build('localhost:5000/dolt-operator-test-runner', '.', dockerfile="Dockerfile.dev")
+doltdbVersion = os.getenv("DOLTDB_ENGINE_VERSION")
+print("DOLTDB_ENGINE_VERSION: " + doltdbVersion)
+docker_build('localhost:5000/dolt-operator-test-runner', '.', dockerfile="Dockerfile.dev", build_args={
+  'DOLTDB_ENGINE_VERSION': doltdbVersion
+})
 
 k8s_yaml(['hack/manifests/e2e/cluster-role.yaml', 'hack/manifests/storageclass.yaml', 'hack/manifests/e2e/snapshot.storage.k8s.io_volumesnapshots.yaml'])
 k8s_resource(

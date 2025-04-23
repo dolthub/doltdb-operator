@@ -22,6 +22,11 @@ func GenerateConfigMapData(doltdb *doltv1alpha.DoltDB) (map[string]string, error
 	data := make(map[string]string)
 	for i := 0; i < int(doltdb.Spec.Replicas); i++ {
 		config := Config{
+			Behavior: Behavior{
+				AutoGCBehavior: AutoGCBehavior{
+					Enable: doltdb.Spec.Server.Behavior.AutoGCBehavior.Enable,
+				},
+			},
 			LogLevel: doltdb.Spec.Server.LogLevel,
 			Cluster: Cluster{
 				StandbyRemotes: generateStandbyRemotes(i, doltdb, remotesAPIPort),

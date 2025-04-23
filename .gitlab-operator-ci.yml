@@ -3,6 +3,9 @@ include:
     ref: main
     file: "docker.yml"
 
+variables:
+  DOLTDB_ENGINE_VERSION: "1.52.0"
+
 # This is a sub-project and will be triggered as a child pipeline from the root .gitlab-ci.yml.
 # Variables are declared in the root .gitlab-ci.yml.
 workflow:
@@ -21,6 +24,8 @@ unit-tests:
 integration-tests:
   stage: test
   extends: .dind
+  tags:
+    - glaas-shared-k8s-dind
   retry: 2 # The DinD runners frequently run into errors.
   timeout: 20m
   interruptible: true
@@ -29,6 +34,7 @@ integration-tests:
     - make install-go-ci
     - export PATH=${PATH}:/usr/local/go/bin
   script: 
+    - echo "Running tests on DoltDB engine version - $DOLTDB_ENGINE_VERSION"
     - make integration-tests-ci
 
 lint:
