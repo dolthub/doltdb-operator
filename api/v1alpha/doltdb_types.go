@@ -137,6 +137,9 @@ type Storage struct {
 	// RetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates.
 	// +optional
 	RetentionPolicy *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy `json:"retentionPolicy,omitempty"`
+	// VolumeSnapshot defines the volume snapshot name to restore DoltDB from snapshot.
+	// +optional
+	VolumeSnapshot string `json:"volumeSnapshot,omitempty"`
 }
 
 // Probes defines the liveness and readiness probes for the DoltDB pods.

@@ -75,6 +75,16 @@ func doltVolumeClaimTemplates(metadata metav1.ObjectMeta, doltdb *doltv1alpha.Do
 			WithLabels(labels).
 			Build()
 
+	var dataSource *corev1.TypedLocalObjectReference
+
+	if doltdb.Spec.Storage.VolumeSnapshot != "" {
+		dataSource = &corev1.TypedLocalObjectReference{
+			APIGroup: ptr.To("snapshot.storage.k8s.io"),
+			Kind:     "VolumeSnapshot",
+			Name:     doltdb.Spec.Storage.VolumeSnapshot,
+		}
+	}
+
 	pvc := corev1.PersistentVolumeClaim{
 		ObjectMeta: objMeta,
 		Spec: corev1.PersistentVolumeClaimSpec{
@@ -87,6 +97,7 @@ func doltVolumeClaimTemplates(metadata metav1.ObjectMeta, doltdb *doltv1alpha.Do
 					corev1.ResourceStorage: ptr.Deref(doltdb.Spec.Storage.Size, *resource.NewQuantity(1, "Gi")),
 				},
 			},
+			DataSource: dataSource,
 		},
 	}
 

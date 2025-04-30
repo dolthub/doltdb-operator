@@ -83,6 +83,7 @@ func testCreateInitialData(ctx context.Context) {
 					WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 				},
+				VolumeSnapshot: "dolt-volume-snapshot",
 			},
 			Resources: &v1.ResourceRequirements{
 				Requests: v1.ResourceList{

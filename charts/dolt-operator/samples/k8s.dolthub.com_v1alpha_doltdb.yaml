@@ -6,12 +6,13 @@ metadata:
 spec:
   engineVersion: 1.52.0
   image: "dolthub/dolt"
-  replicas: 3
+  replicas: 2
   podAnnotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "8080"
   storage:
     size: "10Gi"
+    storageClassName: "dolt-sc"
   server:
     listener:
       maxConnections: 1024

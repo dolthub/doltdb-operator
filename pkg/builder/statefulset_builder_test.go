@@ -197,3 +197,56 @@ func hasVolume(pvcs []corev1.PersistentVolumeClaim, volumeName string) bool {
 	}
 	return false
 }
+
+func TestDoltVolumeClaimTemplatesWithVolumeSnapshot(t *testing.T) {
+	objMeta := metav1.ObjectMeta{
+		Name:      "doltdb-with-snapshot",
+		Namespace: "test-namespace",
+	}
+
+	tests := []struct {
+		name           string
+		doltdb         *doltv1alpha.DoltDB
+		wantDataSource *corev1.TypedLocalObjectReference
+	}{
+		{
+			name: "With VolumeSnapshot",
+			doltdb: &doltv1alpha.DoltDB{
+				ObjectMeta: objMeta,
+				Spec: doltv1alpha.DoltDBSpec{
+					Storage: doltv1alpha.Storage{
+						VolumeSnapshot: "snapshot-name",
+					},
+				},
+			},
+			wantDataSource: &corev1.TypedLocalObjectReference{
+				APIGroup: ptr.To("snapshot.storage.k8s.io"),
+				Kind:     "VolumeSnapshot",
+				Name:     "snapshot-name",
+			},
+		},
+		{
+			name: "Without VolumeSnapshot",
+			doltdb: &doltv1alpha.DoltDB{
+				ObjectMeta: objMeta,
+				Spec: doltv1alpha.DoltDBSpec{
+					Storage: doltv1alpha.Storage{},
+				},
+			},
+			wantDataSource: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pvcs := doltVolumeClaimTemplates(objMeta, tt.doltdb)
+			if len(pvcs) != 1 {
+				t.Fatalf("expected 1 PVC, got %d", len(pvcs))
+			}
+			gotDataSource := pvcs[0].Spec.DataSource
+			if !reflect.DeepEqual(gotDataSource, tt.wantDataSource) {
+				t.Errorf("unexpected DataSource, want: %v, got: %v", tt.wantDataSource, gotDataSource)
+			}
+		})
+	}
+}
