@@ -4,7 +4,7 @@ include:
     file: "docker.yml"
 
 variables:
-  DOLTDB_ENGINE_VERSION: "1.52.0"
+  DOLTDB_ENGINE_VERSION: "1.57.2"
 
 # This is a sub-project and will be triggered as a child pipeline from the root .gitlab-ci.yml.
 # Variables are declared in the root .gitlab-ci.yml.
