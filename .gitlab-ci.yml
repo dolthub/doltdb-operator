@@ -4,8 +4,11 @@ include:
     ref: main
     file: "/mr-tools.yml"
   - project: "REDACTED"
-    ref: main
+    ref: amalpani/feature/REDACTED_artifactory
     file: "/deployment-common.yml"
+  - project: "REDACTED"
+    ref: amalpani/feature/REDACTED_artifactory
+    file: "utils.yml"
 
 variables:
   # Tooling versions for CI builds.

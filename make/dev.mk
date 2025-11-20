@@ -72,9 +72,18 @@ lint: golines golangci-lint ## Run golangci-lint linter
 	
 
 .PHONY: lint-fix
-lint-fix: golines golangci-lint ## Run golangci-lint linter and perform fixes
+lint-fix: golines golangci-lint add-copyright ## Run golangci-lint linter and perform fixes
 	$(GOLINES) --max-len=140 --tab-len=2 --chain-split-dots --shorten-comments --write-output pkg/ internal/ cmd/ api/
 	$(GOLANGCI_LINT) run --fix -v
+
+
+.PHONY: add-copyright
+add-copyright:
+	find . -name "*.go" -type f ! -path "./vendor/*" | while read file; do \
+      if ! grep -q "// Copyright (c) 2025 Electronic Arts Inc. All rights reserved." "$$file"; then \
+       (echo "// Copyright (c) 2025 Electronic Arts Inc. All rights reserved."; cat "$$file") > "$$file.tmp" && mv "$$file.tmp" "$$file"; \
+      fi \
+    done
 
 .PHONY: tiltdev
 tiltdev:

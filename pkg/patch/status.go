@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Electronic Arts Inc. All rights reserved.
+
 package patch
 
 import (

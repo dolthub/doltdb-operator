@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Electronic Arts Inc. All rights reserved.
+
 package builder
 
 import "k8s.io/apimachinery/pkg/runtime"

@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Electronic Arts Inc. All rights reserved.
+
 package builder
 
 import (
@@ -242,7 +244,12 @@ func TestDoltPodTemplateInitContainers(t *testing.T) {
 			}
 
 			if doltConfigInitContainer.Image != tt.doltdb.Spec.Image+":"+tt.doltdb.Spec.EngineVersion {
-				t.Errorf("Expected init container image %s:%s, got %s", tt.doltdb.Spec.Image, tt.doltdb.Spec.EngineVersion, doltConfigInitContainer.Image)
+				t.Errorf(
+					"Expected init container image %s:%s, got %s",
+					tt.doltdb.Spec.Image,
+					tt.doltdb.Spec.EngineVersion,
+					doltConfigInitContainer.Image,
+				)
 			}
 			if len(doltConfigInitContainer.Command) == 0 {
 				t.Error("Expected init container to have commands")

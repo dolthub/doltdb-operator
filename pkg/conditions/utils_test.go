@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Electronic Arts Inc. All rights reserved.
+
 package conditions
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

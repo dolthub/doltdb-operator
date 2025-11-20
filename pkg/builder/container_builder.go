@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Electronic Arts Inc. All rights reserved.
+
 package builder
 
 import (
@@ -138,15 +140,21 @@ func doltInitContainers(doltdb *doltv1alpha.DoltDB) []corev1.Container {
 
 	doltdb.Spec.GlobalConfig.ApplyDefaults()
 
-	commands = append(commands,
+	commands = append(
+		commands,
 		fmt.Sprintf("dolt config --global --add user.name \"%s\"", doltdb.Spec.GlobalConfig.CommitAuthor.Name),
 		fmt.Sprintf("dolt config --global --add user.email \"%s\"", doltdb.Spec.GlobalConfig.CommitAuthor.Email),
-		fmt.Sprintf("dolt config --global --add metrics.disabled %t", ptr.Deref(doltdb.Spec.GlobalConfig.DisableClientUsageMetricsCollection, false)),
-		"cp /etc/doltdb/${POD_NAME}.yaml config.yaml", `
+		fmt.Sprintf(
+			"dolt config --global --add metrics.disabled %t",
+			ptr.Deref(doltdb.Spec.GlobalConfig.DisableClientUsageMetricsCollection, false),
+		),
+		"cp /etc/doltdb/${POD_NAME}.yaml config.yaml",
+		`
 if [ -n "$DOLT_PASSWORD" -a ! -f .doltcfg/privileges.db ]; then
 	dolt sql -q "create user '$DOLT_USERNAME' identified by '$DOLT_PASSWORD'; grant all privileges on *.* to '$DOLT_USERNAME' with grant option;"
 fi
-`)
+`,
+	)
 
 	command := []string{
 		"/bin/sh",
