@@ -4,10 +4,10 @@ include:
     ref: main
     file: "/mr-tools.yml"
   - project: "REDACTED"
-    ref: amalpani/feature/REDACTED_artifactory
+    ref: main
     file: "/deployment-common.yml"
   - project: "REDACTED"
-    ref: amalpani/feature/REDACTED_artifactory
+    ref: main
     file: "utils.yml"
 
 variables:
