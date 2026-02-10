@@ -1,121 +1,110 @@
-## Contributing
-
-Before you can contribute, EA must have a Contributor License Agreement (CLA) on file that has been signed by each contributor.
-You can sign here: [Go to CLA](https://electronicarts.na1.echosign.com/public/esignWidget?wid=CBFCIBAA3AAABLblqZhByHRvZqmltGtliuExmuV-WNzlaJGPhbSRg2ufuPsM3P0QmILZjLpkGslg24-UJtek*)
-
-
 # dolt-operator
 
 Run and operate DoltDB Cluster in a cloud native way. Declaratively manage your Dolt Cluster using Kubernetes CRDs rather than imperative commands.
 
-This operator supports 
+## Features
 
-* Easily provision DoltDB Cluster servers in Kubernetes.
-* Automated primary failover.
-* Scheduled backups.
-* Automated data-plane updates.
-* Declaratively manage SQL resources: users, grants and logical databases.
-* Install it using helm, OLM or static manifests.
+* Easily provision DoltDB Cluster servers in Kubernetes
+* Automated primary failover
+* Scheduled backups via Snapshots
+* Automated data-plane updates
+* Declaratively manage SQL resources: users, grants, and logical databases
+* Install via Helm or static manifests
+
+## Custom Resources
+
+| CRD | Description |
+|-----|-------------|
+| `DoltDB` | Main cluster resource managing StatefulSet, Services, ConfigMaps |
+| `Database` | Logical database within a DoltDB cluster |
+| `User` | Database user management |
+| `Grant` | Permission grants for users |
+| `Snapshot` | Volume snapshots for backups |
 
 ## Getting Started
 
 ### Prerequisites
-- go version v1.22.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- kind version 0.30+.
-- tiltdev version 0.33+.
-- Access to a Kubernetes v1.11.3+ cluster.
 
-### Local development
-**Create k8s cluster:**
+- Go 1.23+
+- Docker 17.03+
+- kubectl 1.11.3+
+- kind 0.30+
+- Tilt 0.33+
+- Access to a Kubernetes 1.11.3+ cluster
+
+### Local Development
+
+**Create kind cluster:**
 ```sh
 make cluster cluster-ctx
 ```
 
-**Run integration tests in interactive mode:**
+**Run unit tests:**
 ```sh
-make tiltdev
+make test
 ```
 
-**Run integration tests in CI mode:**
+**Run integration tests (CI mode):**
 ```sh
 make tiltci
 ```
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
-
+**Run integration tests (interactive mode with Tilt UI):**
 ```sh
-make docker-build docker-push IMG=<some-registry>/dolt-operator:tag
+make tiltdev
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+**Lint and auto-fix:**
+```sh
+make lint-fix
+```
 
-**Install the CRDs into the cluster:**
+## Deployment
+
+### Build and Push Image
+
+```sh
+make docker-build docker-push IMG=<registry>/dolt-operator:tag
+```
+
+### Install CRDs and Deploy
 
 ```sh
 make install
+make deploy IMG=<registry>/dolt-operator:tag
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+> **NOTE**: If you encounter RBAC errors, you may need cluster-admin privileges.
 
-```sh
-make deploy IMG=<some-registry>/dolt-operator:tag
-```
-
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+### Apply Sample Resources
 
 ```sh
 kubectl apply -k config/samples/
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+## Uninstall
 
 ```sh
 kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
 make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
 make undeploy
 ```
 
-## Project Distribution
+## Distribution
 
-Following are the steps to build the installer and distribute this project to users.
-
-1. Build the installer for the image built and published in the registry:
+Build a consolidated installer YAML:
 
 ```sh
-make build-installer IMG=<some-registry>/dolt-operator:tag
+make build-installer IMG=<registry>/dolt-operator:tag
 ```
 
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
-
-2. Using the installer
-
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
+This generates `dist/install.yaml` which users can apply directly:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/dolt-operator/<tag or branch>/dist/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/<org>/dolt-operator/<tag>/dist/install.yaml
 ```
+
+## Contributing
+
+Before you can contribute, EA must have a Contributor License Agreement (CLA) on file that has been signed by each contributor.
+You can sign here: [Go to CLA](https://electronicarts.na1.echosign.com/public/esignWidget?wid=CBFCIBAA3AAABLblqZhByHRvZqmltGtliuExmuV-WNzlaJGPhbSRg2ufuPsM3P0QmILZjLpkGslg24-UJtek*)
