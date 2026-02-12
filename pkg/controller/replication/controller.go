@@ -143,20 +143,24 @@ func (r *ReplicationReconciler) reconcileReplication(ctx context.Context, req *r
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	nextReplicationEpoch := *req.doltdb.Status.ReplicationEpoch + 1
+	// Use current epoch from status - do NOT increment here.
+	// Only switchover should increment the epoch.
+	// This prevents the +2 epoch bug where both switchover and
+	// regular replication reconciliation increment the epoch.
+	currentEpoch := *req.doltdb.Status.ReplicationEpoch
 
 	for i := 0; i < int(req.doltdb.Spec.Replicas); i++ {
 		pod := statefulset.PodName(req.doltdb.ObjectMeta, i)
 
 		if req.doltdb.Status.ReplicationStatus == nil {
-			if err := r.reconcileReplicationInPod(ctx, req, logger, i, nextReplicationEpoch); err != nil {
+			if err := r.reconcileReplicationInPod(ctx, req, logger, i, currentEpoch); err != nil {
 				return ctrl.Result{}, fmt.Errorf("error configuring replication in Pod '%s': %v", pod, err)
 			}
 		}
 
 		state, ok := req.doltdb.Status.ReplicationStatus[pod]
 		if !ok || state == doltv1alpha.ReplicationStateNotConfigured {
-			if err := r.reconcileReplicationInPod(ctx, req, logger, i, nextReplicationEpoch); err != nil {
+			if err := r.reconcileReplicationInPod(ctx, req, logger, i, currentEpoch); err != nil {
 				return ctrl.Result{}, fmt.Errorf("error configuring replication in Pod '%s': %v", pod, err)
 			}
 		}
@@ -170,7 +174,7 @@ func (r *ReplicationReconciler) reconcileReplicationInPod(
 	req *reconcileRequest,
 	logger logr.Logger,
 	index int,
-	nextReplicationEpoch int,
+	epoch int,
 ) error {
 	pod := statefulset.PodName(req.doltdb.ObjectMeta, index)
 	primaryPodIndex := *req.doltdb.Status.CurrentPrimaryPodIndex
@@ -183,7 +187,7 @@ func (r *ReplicationReconciler) reconcileReplicationInPod(
 		if err != nil {
 			return fmt.Errorf("error getting current primary client: %v", err)
 		}
-		return r.replConfig.ConfigurePrimary(ctx, req.doltdb, client, index, nextReplicationEpoch)
+		return r.replConfig.ConfigurePrimary(ctx, req.doltdb, client, index, epoch)
 	}
 
 	logger.Info("Configuring replica", "pod", pod)
@@ -192,7 +196,7 @@ func (r *ReplicationReconciler) reconcileReplicationInPod(
 		return fmt.Errorf("error getting replica client: %v", err)
 	}
 
-	return r.replConfig.ConfigureReplica(ctx, req.doltdb, client, index, nextReplicationEpoch)
+	return r.replConfig.ConfigureReplica(ctx, req.doltdb, client, index, epoch)
 }
 
 func (r *ReplicationReconciler) patchStatus(ctx context.Context, doltdb *doltv1alpha.DoltDB,
