@@ -19,6 +19,11 @@ const (
 
 	ConditionTypeSnapshotCreated string = "SnapshotCronJobCreated"
 
+	// ConditionTypeBackupCompleted indicates that the backup has completed.
+	ConditionTypeBackupCompleted string = "BackupCompleted"
+	// ConditionTypeBackupScheduleCreated indicates that the backup schedule has been created.
+	ConditionTypeBackupScheduleCreated string = "BackupScheduleCreated"
+
 	ConditionReasonSnapshotCreated     string = "SnapshotCronJobCreated"
 	ConditionReasonStatefulSetNotReady string = "StatefulSetNotReady"
 	ConditionReasonStatefulSetReady    string = "StatefulSetReady"
@@ -38,6 +43,13 @@ const (
 	ConditionReasonHealthy     string = "Healthy"
 	ConditionReasonFailed      string = "Failed"
 	ConditionReasonInvalidSpec string = "InvalidSpec"
+
+	ConditionReasonBackupPending   string = "BackupPending"
+	ConditionReasonBackupRunning   string = "BackupRunning"
+	ConditionReasonBackupCompleted string = "BackupCompleted"
+	ConditionReasonBackupFailed    string = "BackupFailed"
+
+	ConditionReasonBackupScheduleCreated string = "BackupScheduleCreated"
 )
 
 // SetCondition sets a status condition to DoltDB

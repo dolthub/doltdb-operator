@@ -21,6 +21,14 @@ func (b *Builder) BuildServiceAccount(key types.NamespacedName, doltdb *doltv1al
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: objMeta,
 	}
+	if doltdb.Spec.ServiceAccountAnnotations != nil {
+		if sa.Annotations == nil {
+			sa.Annotations = make(map[string]string)
+		}
+		for k, v := range doltdb.Spec.ServiceAccountAnnotations {
+			sa.Annotations[k] = v
+		}
+	}
 	if err := controllerutil.SetControllerReference(doltdb, sa, b.scheme); err != nil {
 		return nil, fmt.Errorf("error setting controller reference to ServiceAccount: %v", err)
 	}

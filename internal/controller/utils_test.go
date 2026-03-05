@@ -57,6 +57,16 @@ var (
 		Namespace: testDoltKey.Namespace,
 	}
 	testDoltAppUserPwdSecretKey = "dolt-user-secret-key"
+
+	testBackupKey = types.NamespacedName{
+		Name:      "dolt-backup-test",
+		Namespace: testDoltKey.Namespace,
+	}
+
+	testBackupScheduleKey = types.NamespacedName{
+		Name:      "dolt-backup-schedule-test",
+		Namespace: testDoltKey.Namespace,
+	}
 )
 
 func testCreateInitialData(ctx context.Context) {

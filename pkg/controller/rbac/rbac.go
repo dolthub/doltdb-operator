@@ -41,6 +41,9 @@ func (r *Reconciler) ReconcileServiceAccount(
 	var existingSA corev1.ServiceAccount
 	err := r.Get(ctx, key, &existingSA)
 	if err == nil {
+		if err := r.patchServiceAccountAnnotations(ctx, &existingSA, doltdb); err != nil {
+			return nil, err
+		}
 		return &existingSA, nil
 	}
 	if !apierrors.IsNotFound(err) {
@@ -208,6 +211,33 @@ func (r *Reconciler) reconcileClusterRoleBinding(
 	}
 	if err := r.Create(ctx, crdb); err != nil {
 		return fmt.Errorf("error creating ClusterRoleBinding: %v", err)
+	}
+	return nil
+}
+
+// patchServiceAccountAnnotations patches the ServiceAccount annotations to match the desired state.
+func (r *Reconciler) patchServiceAccountAnnotations(
+	ctx context.Context,
+	existingSA *corev1.ServiceAccount,
+	doltdb *doltv1alpha.DoltDB,
+) error {
+	desired, err := r.builder.BuildServiceAccount(
+		types.NamespacedName{Name: existingSA.Name, Namespace: existingSA.Namespace}, doltdb,
+	)
+	if err != nil {
+		return fmt.Errorf("error building desired ServiceAccount: %v", err)
+	}
+
+	patch := client.MergeFrom(existingSA.DeepCopy())
+	if existingSA.Annotations == nil {
+		existingSA.Annotations = make(map[string]string)
+	}
+	for k, v := range desired.Annotations {
+		existingSA.Annotations[k] = v
+	}
+
+	if err := r.Patch(ctx, existingSA, patch); err != nil {
+		return fmt.Errorf("error patching ServiceAccount annotations: %v", err)
 	}
 	return nil
 }

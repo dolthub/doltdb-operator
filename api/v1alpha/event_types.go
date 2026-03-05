@@ -27,4 +27,13 @@ const (
 	ReasonPrimarySwitched = "PrimarySwitched"
 	// ReasonCRDNotFound indicates that a third party CRD is not present in the cluster.
 	ReasonCRDNotFound = "CRDNotFound"
+
+	// ReasonBackupStarted indicates that a backup has started.
+	ReasonBackupStarted = "BackupStarted"
+	// ReasonBackupCompleted indicates that a backup has completed successfully.
+	ReasonBackupCompleted = "BackupCompleted"
+	// ReasonBackupFailed indicates that a backup has failed.
+	ReasonBackupFailed = "BackupFailed"
+	// ReasonBackupScheduleTriggered indicates that a backup schedule has triggered a new backup.
+	ReasonBackupScheduleTriggered = "BackupScheduleTriggered"
 )

@@ -18,6 +18,11 @@ type DoltDBSpec struct {
 	// ServiceAccountName defines the service account for the operator.
 	// +optional
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
+	// ServiceAccountAnnotations are annotations to apply to the managed ServiceAccount.
+	// Use this to configure cloud provider integrations such as IRSA (AWS), Workload Identity (GCP),
+	// or Azure AD workload identity.
+	// +optional
+	ServiceAccountAnnotations map[string]string `json:"serviceAccountAnnotations,omitempty"`
 	// Image specifies the container image name for the Dolt DB server.
 	// +kubebuilder:default:="dolthub/dolt"
 	// +optional
@@ -102,6 +107,10 @@ type DoltDBSpec struct {
 	// GlobalConfig defines the global configuration for the DoltDB server.
 	// +optional
 	GlobalConfig GlobalConfig `json:"globalConfig,omitempty"`
+	// Env allows injecting additional environment variables into the DoltDB container.
+	// This is used, for example, to supply AWS credentials for S3 backups in non-IRSA environments.
+	// +optional
+	Env []v1.EnvVar `json:"env,omitempty"`
 }
 
 // PodDisruptionBudget is the Pod availability bundget for a DoltDB

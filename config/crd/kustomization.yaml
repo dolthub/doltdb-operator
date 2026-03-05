@@ -7,6 +7,8 @@ resources:
 - bases/k8s.dolthub.com_databases.yaml
 - bases/k8s.dolthub.com_users.yaml
 - bases/k8s.dolthub.com_grants.yaml
+- bases/k8s.dolthub.com_backups.yaml
+- bases/k8s.dolthub.com_backupschedules.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 # patches:

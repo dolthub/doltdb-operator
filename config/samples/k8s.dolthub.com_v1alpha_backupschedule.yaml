@@ -1,13 +1,14 @@
 apiVersion: k8s.dolthub.com/v1alpha
-kind: Snapshot
+kind: BackupSchedule
 metadata:
+  name: backupschedule-sample
   labels:
     app.kubernetes.io/name: dolt-operator
     app.kubernetes.io/managed-by: kustomize
-  name: dolt
-  namespace: default
 spec:
   doltDBRef:
-    name: dolt
-    namespace: default
-  frequencySchedule: "1 * * * *"
+    name: doltdb-sample
+  schedule: "0 2 * * *"
+  storage:
+    local:
+      path: /var/backups/dolt

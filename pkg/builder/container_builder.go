@@ -63,7 +63,7 @@ func doltContainerCommand(doltdb *doltv1alpha.DoltDB) []string {
 }
 
 func doltEnv(doltdb *doltv1alpha.DoltDB) []corev1.EnvVar {
-	return []corev1.EnvVar{
+	env := []corev1.EnvVar{
 		{
 			Name:  "DOLT_ROOT_PATH",
 			Value: DoltDataMountPath,
@@ -89,6 +89,8 @@ func doltEnv(doltdb *doltv1alpha.DoltDB) []corev1.EnvVar {
 			},
 		},
 	}
+	env = append(env, doltdb.Spec.Env...)
+	return env
 }
 
 func doltContainerPorts(doltdb *doltv1alpha.DoltDB) []corev1.ContainerPort {

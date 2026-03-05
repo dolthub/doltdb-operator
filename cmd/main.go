@@ -34,6 +34,8 @@ import (
 	"github.com/electronicarts/doltdb-operator/internal/controller"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
 	"github.com/electronicarts/doltdb-operator/pkg/conditions"
+	"github.com/electronicarts/doltdb-operator/pkg/controller/backup"
+	"github.com/electronicarts/doltdb-operator/pkg/controller/backupschedule"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/configmap"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/database"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/rbac"
@@ -298,6 +300,28 @@ func main() {
 	if err = controller.NewGrantReconciler(client, refResolver, conditionReady, sqlOpts...).
 		SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller", "controller", "Grant")
+		os.Exit(1)
+	}
+
+	backupReconciler := backup.NewReconciler(client)
+	if err = (&controller.BackupReconciler{
+		Client:           client,
+		Scheme:           scheme,
+		RefResolver:      refResolver,
+		BackupReconciler: backupReconciler,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Backup")
+		os.Exit(1)
+	}
+
+	scheduleReconciler := backupschedule.NewReconciler(client, scheme)
+	if err = (&controller.BackupScheduleReconciler{
+		Client:             client,
+		Scheme:             scheme,
+		RefResolver:        refResolver,
+		ScheduleReconciler: scheduleReconciler,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BackupSchedule")
 		os.Exit(1)
 	}
 

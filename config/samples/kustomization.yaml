@@ -5,4 +5,6 @@ resources:
 - k8s.dolthub.com_v1alpha_snapshot.yaml
 - k8s.dolthub.com_v1alpha_user.yaml
 - k8s.dolthub.com_v1alpha_grant.yaml
+- k8s.dolthub.com_v1alpha_backup.yaml
+- k8s.dolthub.com_v1alpha_backupschedule.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

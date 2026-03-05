@@ -29,6 +29,8 @@ import (
 	k8sdolthubcomv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/builder"
 	"github.com/electronicarts/doltdb-operator/pkg/conditions"
+	"github.com/electronicarts/doltdb-operator/pkg/controller/backup"
+	"github.com/electronicarts/doltdb-operator/pkg/controller/backupschedule"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/configmap"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/database"
 	"github.com/electronicarts/doltdb-operator/pkg/controller/rbac"
@@ -198,6 +200,24 @@ var _ = BeforeSuite(func() {
 		RefResolver:              refResolver,
 		VolumeSnapshotReconciler: volumeSnapshotReconciler,
 		Builder:                  builder,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	backupReconciler := backup.NewReconciler(k8sClient)
+	err = (&BackupReconciler{
+		Client:           k8sClient,
+		Scheme:           k8sClient.Scheme(),
+		RefResolver:      refResolver,
+		BackupReconciler: backupReconciler,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	scheduleReconciler := backupschedule.NewReconciler(k8sClient, k8sClient.Scheme())
+	err = (&BackupScheduleReconciler{
+		Client:             k8sClient,
+		Scheme:             k8sClient.Scheme(),
+		RefResolver:        refResolver,
+		ScheduleReconciler: scheduleReconciler,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
