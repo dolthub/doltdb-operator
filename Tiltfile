@@ -3,8 +3,6 @@ load('ext://namespace', 'namespace_create', 'namespace_inject')
 load('ext://helm_remote', 'helm_remote')
 load('ext://helm_resource', 'helm_resource', 'helm_repo')
 
-# Commenting out because this is not needed for now
-# git_checkout('REDACTED', checkout_dir="tilt_git/common_tilt")
 # _mydir = os.path.abspath(os.path.dirname(__file__))
 # load('tilt_git/common_tilt/Tiltfile', 'setup_harbor_repo')
 namespace_create('glrunner')
