@@ -1918,8 +1918,7 @@ spec:
                       passwordSecretKeyRef:
                         description: |-
                           PasswordSecretKeyRef references a Secret key containing the SQL password
-                          for the MCP user. If not set and user is not overridden, the root
-                          password is used.
+                          for the MCP user. If not set, the root password Secret is used.
                         properties:
                           key:
                             type: string

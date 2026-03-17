@@ -111,8 +111,7 @@ type MCPServer struct {
 	// +optional
 	User string `json:"user,omitempty"`
 	// PasswordSecretKeyRef references a Secret key containing the SQL password
-	// for the MCP user. If not set and user is not overridden, the root
-	// password is used.
+	// for the MCP user. If not set, the root password Secret is used.
 	// +optional
 	PasswordSecretKeyRef *SecretKeySelector `json:"passwordSecretKeyRef,omitempty"`
 	// Database restricts the MCP server to a specific database.
@@ -138,6 +137,9 @@ func (s *Server) ApplyDefaults() {
 	s.Metrics.ApplyDefaults()
 	s.Listener.ApplyDefaults()
 	s.Cluster.ApplyDefaults()
+	if s.MCPServer != nil {
+		s.MCPServer.ApplyDefaults()
+	}
 }
 
 func (m *Metrics) ApplyDefaults() {

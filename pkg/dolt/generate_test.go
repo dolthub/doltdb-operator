@@ -218,57 +218,23 @@ func TestGenerateConfigMapData(t *testing.T) {
 		},
 		{
 			name: "with MCP server custom user",
-			doltdb: &doltv1alpha.DoltDB{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: "default",
+			doltdb: newTestDoltDBWithMCP(&doltv1alpha.MCPServer{
+				Port:     7007,
+				User:     "mcp-agent",
+				Database: "testdb",
+				PasswordSecretKeyRef: &doltv1alpha.SecretKeySelector{
+					LocalObjectReference: doltv1alpha.LocalObjectReference{Name: "mcp-creds"},
+					Key:                  "password",
 				},
-				Spec: doltv1alpha.DoltDBSpec{
-					Replicas: 1,
-					Server: doltv1alpha.Server{
-						Listener: doltv1alpha.Listener{
-							Host:           "0.0.0.0",
-							Port:           3306,
-							MaxConnections: 128,
-						},
-						LogLevel: "trace",
-						MCPServer: &doltv1alpha.MCPServer{
-							Port:     7007,
-							User:     "mcp-agent",
-							Database: "testdb",
-							PasswordSecretKeyRef: &doltv1alpha.SecretKeySelector{
-								LocalObjectReference: doltv1alpha.LocalObjectReference{Name: "mcp-creds"},
-								Key:                  "password",
-							},
-						},
-					},
-				},
-			},
+			}),
 			expectedData:  readTestData(t, "mcp_server_config.yaml"),
 			expectedError: false,
 		},
 		{
 			name: "with MCP server default credentials",
-			doltdb: &doltv1alpha.DoltDB{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: "default",
-				},
-				Spec: doltv1alpha.DoltDBSpec{
-					Replicas: 1,
-					Server: doltv1alpha.Server{
-						Listener: doltv1alpha.Listener{
-							Host:           "0.0.0.0",
-							Port:           3306,
-							MaxConnections: 128,
-						},
-						LogLevel: "trace",
-						MCPServer: &doltv1alpha.MCPServer{
-							Port: 7007,
-						},
-					},
-				},
-			},
+			doltdb: newTestDoltDBWithMCP(&doltv1alpha.MCPServer{
+				Port: 7007,
+			}),
 			expectedData:  readTestData(t, "mcp_server_default_creds.yaml"),
 			expectedError: false,
 		},
@@ -458,6 +424,27 @@ func TestConfigMCPServerOmitEmpty(t *testing.T) {
 	}
 	if !strings.Contains(string(yamlDataWithMCP), "mcp_server:") {
 		t.Error("config with MCPServer set should contain 'mcp_server:' in YAML output")
+	}
+}
+
+func newTestDoltDBWithMCP(mcp *doltv1alpha.MCPServer) *doltv1alpha.DoltDB {
+	return &doltv1alpha.DoltDB{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+		Spec: doltv1alpha.DoltDBSpec{
+			Replicas: 1,
+			Server: doltv1alpha.Server{
+				Listener: doltv1alpha.Listener{
+					Host:           "0.0.0.0",
+					Port:           3306,
+					MaxConnections: 128,
+				},
+				LogLevel:  "trace",
+				MCPServer: mcp,
+			},
+		},
 	}
 }
 
