@@ -1,0 +1,73 @@
+name: Publish Helm Charts
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGISTRY: public.ecr.aws/dolthub
+  IMAGE_NAME: doltdb-operator-image
+
+jobs:
+  release:
+    name: Build and Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Compute version
+        id: version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: ${{ secrets.ROLE_TO_ASSUME }}
+          aws-region: us-east-1
+
+      - name: Login to ECR Public
+        run: |
+          aws ecr-public get-login-password --region us-east-1 | \
+            docker login --username AWS --password-stdin public.ecr.aws
+          aws ecr-public get-login-password --region us-east-1 | \
+            helm registry login --username AWS --password-stdin public.ecr.aws
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Build and push container image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198e19c816612b # v6.18.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Setup Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+
+      - name: Update chart image reference
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s|repository: .*|repository: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}|" charts/doltdb-operator/values.yaml
+          sed -i "s|tag: .*|tag: \"${VERSION}\"|" charts/doltdb-operator/values.yaml
+
+      - name: Package and push Helm charts
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          helm package charts/doltdb-operator-crds --version "$VERSION" --app-version "$VERSION"
+          helm package charts/doltdb-operator --version "$VERSION" --app-version "$VERSION"
+
+          helm push "doltdb-operator-crds-${VERSION}.tgz" "oci://${{ env.REGISTRY }}"
+          helm push "doltdb-operator-${VERSION}.tgz" "oci://${{ env.REGISTRY }}"
