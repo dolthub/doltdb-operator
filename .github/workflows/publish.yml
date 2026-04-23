@@ -3,6 +3,17 @@ name: Publish Helm Charts
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (MAJOR.MINOR.PATCH)"
+        required: true
+        type: string
+      latest:
+        description: "Tag artifacts as latest"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -20,15 +31,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || format('v{0}', inputs.version) }}
 
       - name: Compute version
         id: version
         run: |
-          TAG="${{ github.event.release.tag_name }}"
-          VERSION="${TAG#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+            IS_LATEST="${{ inputs.latest }}"
+          else
+            TAG="${{ github.event.release.tag_name }}"
+            VERSION="${TAG#v}"
+            IS_LATEST="${{ github.event.release.make_latest == 'true' }}"
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "is_latest=${{ github.event.release.make_latest == 'true' }}" >> "$GITHUB_OUTPUT"
+          echo "is_latest=${IS_LATEST}" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
