@@ -14,9 +14,14 @@ on:
         required: false
         type: boolean
         default: false
+      promote:
+        description: "Promote the release after publishing"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 env:
@@ -42,7 +47,7 @@ jobs:
           else
             TAG="${{ github.event.release.tag_name }}"
             VERSION="${TAG#v}"
-            IS_LATEST="${{ github.event.release.make_latest == 'true' }}"
+            IS_LATEST="true"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "is_latest=${IS_LATEST}" >> "$GITHUB_OUTPUT"
@@ -103,3 +108,12 @@ jobs:
             helm push "doltdb-operator-crds-latest.tgz" "oci://${{ env.REGISTRY }}"
             helm push "doltdb-operator-latest.tgz" "oci://${{ env.REGISTRY }}"
           fi
+
+  promote:
+    name: Promote Release
+    needs: release
+    if: github.event_name == 'release' || inputs.promote
+    uses: ./.github/workflows/promote.yml
+    with:
+      tag_name: ${{ github.event.release.tag_name || format('v{0}', inputs.version) }}
+    secrets: inherit
