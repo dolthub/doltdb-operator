@@ -14,6 +14,11 @@ on:
         required: false
         type: boolean
         default: false
+      promote:
+        description: "Promote the release after publishing"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -107,8 +112,8 @@ jobs:
   promote:
     name: Promote Release
     needs: release
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || inputs.promote
     uses: ./.github/workflows/promote.yml
     with:
-      tag_name: ${{ github.event.release.tag_name }}
+      tag_name: ${{ github.event.release.tag_name || format('v{0}', inputs.version) }}
     secrets: inherit
