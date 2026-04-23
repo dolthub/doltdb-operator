@@ -7,6 +7,11 @@ on:
         description: "Release version (MAJOR.MINOR.PATCH)"
         required: true
         type: string
+      latest:
+        description: "Mark this release as latest"
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -48,4 +53,5 @@ jobs:
         run: |
           gh release create "v${{ inputs.version }}" \
             --title "v${{ inputs.version }}" \
-            --generate-notes
+            --generate-notes \
+            ${{ inputs.latest && '--latest' || '--latest=false' }}

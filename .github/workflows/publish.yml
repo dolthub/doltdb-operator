@@ -28,6 +28,7 @@ jobs:
           TAG="${{ github.event.release.tag_name }}"
           VERSION="${TAG#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "is_latest=${{ github.event.release.make_latest == 'true' }}" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
@@ -56,7 +57,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ steps.version.outputs.is_latest == 'true' && format('{0}/{1}:latest', env.REGISTRY, env.IMAGE_NAME) || '' }}
 
       - name: Setup Helm
         uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
@@ -70,9 +71,18 @@ jobs:
       - name: Package and push Helm charts
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          IS_LATEST="${{ steps.version.outputs.is_latest }}"
 
           helm package charts/doltdb-operator-crds --version "$VERSION" --app-version "$VERSION"
           helm package charts/doltdb-operator --version "$VERSION" --app-version "$VERSION"
 
           helm push "doltdb-operator-crds-${VERSION}.tgz" "oci://${{ env.REGISTRY }}"
           helm push "doltdb-operator-${VERSION}.tgz" "oci://${{ env.REGISTRY }}"
+
+          if [ "$IS_LATEST" = "true" ]; then
+            helm package charts/doltdb-operator-crds --version "latest" --app-version "$VERSION"
+            helm package charts/doltdb-operator --version "latest" --app-version "$VERSION"
+
+            helm push "doltdb-operator-crds-latest.tgz" "oci://${{ env.REGISTRY }}"
+            helm push "doltdb-operator-latest.tgz" "oci://${{ env.REGISTRY }}"
+          fi
