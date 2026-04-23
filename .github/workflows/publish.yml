@@ -84,6 +84,9 @@ jobs:
       - name: Setup Helm
         uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
 
+      - name: Setup crane
+        uses: imjasonh/setup-crane@31b88efe9de28ae0ffa220711af4b60be9435f6e # v0.4
+
       - name: Update chart image reference
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -102,11 +105,8 @@ jobs:
           helm push "doltdb-operator-${VERSION}.tgz" "oci://${{ env.REGISTRY }}"
 
           if [ "$IS_LATEST" = "true" ]; then
-            helm package charts/doltdb-operator-crds --version "latest" --app-version "$VERSION"
-            helm package charts/doltdb-operator --version "latest" --app-version "$VERSION"
-
-            helm push "doltdb-operator-crds-latest.tgz" "oci://${{ env.REGISTRY }}"
-            helm push "doltdb-operator-latest.tgz" "oci://${{ env.REGISTRY }}"
+            crane tag "${{ env.REGISTRY }}/doltdb-operator-crds:${VERSION}" latest
+            crane tag "${{ env.REGISTRY }}/doltdb-operator:${VERSION}" latest
           fi
 
   promote:
