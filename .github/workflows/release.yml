@@ -57,6 +57,12 @@ jobs:
           # Install operator
           helm install doltdb-operator oci://public.ecr.aws/dolthub/doltdb-operator --version ${VERSION}
           \`\`\`
+
+          ## Container Image
+
+          \`\`\`bash
+          docker pull public.ecr.aws/dolthub/doltdb-operator-image:${VERSION}
+          \`\`\`
           EOF
           )"
 

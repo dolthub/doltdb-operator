@@ -28,11 +28,11 @@ This operator takes care of all of that. Define your DoltDB cluster as a Kuberne
 ### Install with Helm
 
 ```sh
-# Add the CRDs chart (install separately for lifecycle management)
-helm install doltdb-operator-crds oci://ghcr.io/electronicarts/doltdb-operator-crds
+# Install CRDs (separately for lifecycle management)
+helm install doltdb-operator-crds oci://public.ecr.aws/dolthub/doltdb-operator-crds
 
 # Install the operator
-helm install doltdb-operator oci://ghcr.io/electronicarts/doltdb-operator
+helm install doltdb-operator oci://public.ecr.aws/dolthub/doltdb-operator
 ```
 
 ### Deploy a DoltDB Cluster
@@ -125,8 +125,8 @@ Key options:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `image.repository` | Operator container image | — |
-| `image.tag` | Operator image tag | — |
+| `image.repository` | Operator container image | `public.ecr.aws/dolthub/doltdb-operator-image` |
+| `image.tag` | Operator image tag | Chart appVersion |
 | `replicas` | Number of operator replicas | `1` |
 | `installCrds` | Install CRDs with the operator chart | `false` |
 | `installClusterRole` | Create ClusterRole and ClusterRoleBinding | `true` |
