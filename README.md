@@ -43,7 +43,7 @@ kind: DoltDB
 metadata:
   name: my-dolt
 spec:
-  engineVersion: "1.57.2"
+  engineVersion: "2.4.1"
   image: dolthub/dolt
   replicas: 2
   storage:
