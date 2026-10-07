@@ -56,7 +56,7 @@ ifeq (,$(shell which kubectl 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(KUBECTL)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(KUBECTL) https://dl.k8s.io/release/v1.36.4/bin/linux/$${ARCH}/kubectl ;\
+	curl -sSLo $(KUBECTL) https://dl.k8s.io/release/v1.36.4/bin/$${OS}/$${ARCH}/kubectl ;\
 	chmod +x $(KUBECTL) ;\
 	}
 else
