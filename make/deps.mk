@@ -21,7 +21,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.16.1
 ENVTEST_VERSION ?= release-0.19
 GOLANGCI_LINT_VERSION ?= v1.63.4
 GOLINES_VERSION ?= latest
-KIND_VERSION ?= v0.30.0
+KIND_VERSION ?= v0.33.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -56,7 +56,7 @@ ifeq (,$(shell which kubectl 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(KUBECTL)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(KUBECTL) https://dl.k8s.io/release/v1.31.0/bin/linux/$${ARCH}/kubectl ;\
+	curl -sSLo $(KUBECTL) https://dl.k8s.io/release/v1.36.4/bin/linux/$${ARCH}/kubectl ;\
 	chmod +x $(KUBECTL) ;\
 	}
 else
