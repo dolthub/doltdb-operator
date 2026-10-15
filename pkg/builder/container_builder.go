@@ -150,7 +150,8 @@ func doltContainerPorts(doltdb *doltv1alpha.DoltDB) []corev1.ContainerPort {
 
 func doltContainers(doltdb *doltv1alpha.DoltDB) []corev1.Container {
 	var lifecycle *corev1.Lifecycle
-	if doltdb.Replication().Enabled {
+	replication := doltdb.Replication()
+	if replication.Enabled && *replication.Primary.AutomaticFailover {
 		lifecycle = doltLifecycle(doltdb)
 	}
 
