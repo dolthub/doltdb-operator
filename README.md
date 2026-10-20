@@ -153,7 +153,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contr
 
 ### Local Tilt Development
 
-Requires Go 1.23.x, Docker, kubectl, kind 0.32 or newer, and Tilt. The workflow uses a dedicated `dolt-operator-dev` kind cluster (Kubernetes 1.36.1) and DoltDB engine 2.4.1. Its isolated kubeconfig is stored at `.local/kubeconfig` in the repository and does not change the current kubectl context.
+Requires Go 1.23.x, Docker, kubectl, kind 0.32 or newer, and Tilt. The workflow uses a dedicated `doltdb-local` Kind cluster (Kubernetes 1.36.1) with two nodes:
+
+- One Kubernetes control-plane node.
+- One worker; `make local-dev-up` labels it `node-role.kubernetes.io/worker` after registration, and the Istio control plane, operator, and DoltDB pods share it.
+
+Kind topology is applied only when a cluster is created. The workflow now uses `doltdb-local`; an existing `dolt-operator-dev` cluster is not renamed or deleted automatically. To remove that old cluster, run `kind delete cluster --name dolt-operator-dev --kubeconfig .local/kubeconfig`; this deletes its data.
 
 The workflow installs Istio 1.23.6 with the minimal profile. It enables sidecar injection in `doltdb-operator-system` and `default`. It does not set a strict mTLS policy. Istio 1.23 reached end of support in April 2025, and Kubernetes 1.36.1 is outside its supported range.
 
@@ -168,10 +173,10 @@ To access the cluster from another terminal, merge the isolated kubeconfig into 
 ```sh
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}:$PWD/.local/kubeconfig"
 kubectl config get-contexts
-kubectl --context kind-dolt-operator-dev get pods -A
+kubectl --context kind-doltdb-local get pods -A
 ```
 
-This merged setting applies only to this shell and does not edit `~/.kube/config`. Pass `--context kind-dolt-operator-dev` to commands that should target the local cluster.
+This merged setting applies only to this shell and does not edit `~/.kube/config`. Pass `--context kind-doltdb-local` to commands that should target the local cluster.
 
 Press Ctrl+C in that terminal to stop Tilt; the cluster and workloads remain. Then run:
 

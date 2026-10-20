@@ -87,7 +87,7 @@ add-copyright:
       fi \
     done
 
-LOCAL_DEV_CLUSTER := dolt-operator-dev
+LOCAL_DEV_CLUSTER := doltdb-local
 LOCAL_DEV_KUBECONFIG := .local/kubeconfig
 
 ISTIO_VERSION ?= 1.23.6
@@ -119,6 +119,7 @@ local-dev-up: ## Start the dedicated local-dev kind cluster and Tilt environment
 	kind get clusters | grep -Fxq "$(LOCAL_DEV_CLUSTER)" || kind create cluster --name "$(LOCAL_DEV_CLUSTER)" --config hack/manifests/kind/kind-local-dev.yaml --kubeconfig "$(LOCAL_DEV_KUBECONFIG)"
 
 	kind export kubeconfig --name "$(LOCAL_DEV_CLUSTER)" --kubeconfig "$(LOCAL_DEV_KUBECONFIG)"
+	KUBECONFIG="$(LOCAL_DEV_KUBECONFIG)" kubectl label node "$(LOCAL_DEV_CLUSTER)-worker" node-role.kubernetes.io/worker=worker --overwrite
 	KUBECONFIG="$(LOCAL_DEV_KUBECONFIG)" ISTIO_ENABLED="$(ISTIO_ENABLED)" tilt up -f Tiltfile.dev
 
 .PHONY: local-dev-down
