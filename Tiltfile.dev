@@ -1,29 +1,63 @@
-load('ext://git_resource', 'git_checkout')
-load('ext://namespace', 'namespace_create', 'namespace_inject')
-load('ext://helm_remote', 'helm_remote')
-load('ext://helm_resource', 'helm_resource', 'helm_repo')
+# Local setup
+make_deps = ['Makefile', 'make']
+codegen_deps = make_deps + ['api']
 
-local_resource('Install Kustomize', cmd='make kustomize', deps=['Makefile', 'make/*'])
-local_resource('Go Deps', cmd='make vendor', deps=['Makefile', 'go.mod', 'go.sum'])
-local_resource('Build manifests', cmd='make manifests', deps=['Makefile', 'make/*', 'api/*'])
-local_resource('Generate CRDs', cmd='make generate', deps=['Makefile', 'make/*', 'api/*'])
-local_resource('Install CRDs', cmd='make install', deps=['Makefile', 'make/*', 'api/*'])
+# Ignore generated output to prevent code generation from retriggering itself.
+codegen_ignores = ['api/v1alpha/zz_generated.deepcopy.go']
 
-docker_build('localhost:5000/doltdb-operator:local', '.', dockerfile="Dockerfile")
+local_resource('Kustomize installation', cmd='make kustomize', deps=make_deps)
+local_resource(
+  'DeepCopy generation',
+  cmd='make generate',
+  deps=codegen_deps,
+  ignore=codegen_ignores,
+)
+# make install runs make manifests before applying the CRDs.
+local_resource(
+  'CRD installation',
+  cmd='make install',
+  deps=codegen_deps,
+  ignore=codegen_ignores,
+  resource_deps=['Kustomize installation', 'DeepCopy generation'],
+)
 
+docker_build('localhost:5000/doltdb-operator:local', '.', dockerfile='Dockerfile')
+
+# Cluster prerequisites
 k8s_yaml([
-  'hack/manifests/storageclass.yaml', 
+  'hack/manifests/storageclass.yaml',
   'hack/manifests/e2e/snapshot.storage.k8s.io_volumesnapshots.yaml',
   'hack/manifests/doltdb-secret.yaml',
 ])
-
 k8s_resource(
   objects=[
     'standard-resize:storageclass',
     'volumesnapshots.snapshot.storage.k8s.io:customresourcedefinition',
     'dolt-credentials:secret',
   ],
-  new_name='Storage Class & Snapshotter CRDs'
+  new_name='DoltDB Prerequisites',
 )
 
-k8s_yaml(kustomize('config/default'))
+# Operator
+operator_yaml = kustomize('config/default')
+k8s_yaml(operator_yaml)
+# Tilt already associates the Deployment and Service with the operator workload.
+operator_objects = [
+  '%s:%s' % (obj['metadata']['name'], obj['kind'].lower())
+  for obj in decode_yaml_stream(operator_yaml)
+  if obj['kind'] not in ['Deployment', 'Service']
+]
+k8s_resource(
+  workload='doltdb-operator-controller-manager',
+  objects=operator_objects,
+  new_name='DoltDB Operator',
+  resource_deps=['CRD installation'],
+)
+
+# DoltDB cluster
+k8s_yaml('hack/manifests/doltdb-local-dev.yaml')
+k8s_resource(
+  new_name='DoltDB Cluster',
+  objects=['dolt:doltdb'],
+  resource_deps=['DoltDB Prerequisites', 'DoltDB Operator'],
+)

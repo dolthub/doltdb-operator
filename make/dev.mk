@@ -87,10 +87,24 @@ add-copyright:
       fi \
     done
 
-.PHONY: tiltdev
-tiltdev:
-	make cluster-ci CLUSTER=doltdev cluster-ctx CLUSTER=doltdev
-	tilt up -f Tiltfile.dev
+LOCAL_DEV_CLUSTER := dolt-operator-dev
+LOCAL_DEV_KUBECONFIG := .local/kubeconfig
+
+.PHONY: local-dev-up
+local-dev-up: ## Start the dedicated local-dev kind cluster and Tilt environment.
+	@go version | grep -Eq '^go version go1\.23\.' || { echo "local dev requires Go 1.23.x for controller-gen v0.16.1" >&2; exit 1; }
+	@mkdir -p .local
+
+	kind get clusters | grep -Fxq "$(LOCAL_DEV_CLUSTER)" || kind create cluster --name "$(LOCAL_DEV_CLUSTER)" --config hack/manifests/kind/kind-local-dev.yaml --kubeconfig "$(LOCAL_DEV_KUBECONFIG)"
+
+	kind export kubeconfig --name "$(LOCAL_DEV_CLUSTER)" --kubeconfig "$(LOCAL_DEV_KUBECONFIG)"
+	KUBECONFIG="$(LOCAL_DEV_KUBECONFIG)" tilt up -f Tiltfile.dev
+
+.PHONY: local-dev-down
+local-dev-down: ## Delete the dedicated local-dev cluster; stop Tilt with Ctrl+C first.
+	kind delete cluster --name "$(LOCAL_DEV_CLUSTER)" --kubeconfig "$(LOCAL_DEV_KUBECONFIG)"
+	rm -f "$(LOCAL_DEV_KUBECONFIG)"
+	rmdir .local 2>/dev/null || true
 
 .PHONY: tilttest
 tilttest:

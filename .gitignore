@@ -39,5 +39,6 @@ service-account.json
 *.key
 
 # Development
+.local/
 tilt_git/
 vendor

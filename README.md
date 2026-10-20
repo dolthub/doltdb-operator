@@ -151,6 +151,31 @@ See [SECURITY.md](SECURITY.md) for more details.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contribution guidelines.
 
+### Local Tilt Development
+
+Requires Go 1.23.x, Docker, kubectl, kind 0.32 or newer, and Tilt. The workflow uses a dedicated `dolt-operator-dev` kind cluster (Kubernetes 1.36.1) and DoltDB engine 2.4.1. Its isolated kubeconfig is stored at `.local/kubeconfig` in the repository and does not change the current kubectl context.
+
+```sh
+make local-dev-up    # Create/reuse the cluster and start Tilt in this terminal
+```
+
+To access the cluster from another terminal, merge the isolated kubeconfig into `kubectl`'s configuration for that shell:
+
+```sh
+export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}:$PWD/.local/kubeconfig"
+kubectl config get-contexts
+kubectl --context kind-dolt-operator-dev get pods -A
+```
+
+This merged setting applies only to this shell and does not edit `~/.kube/config`. Pass `--context kind-dolt-operator-dev` to commands that should target the local cluster.
+
+Press Ctrl+C in that terminal to stop Tilt; the cluster and workloads remain. Then run:
+
+```sh
+make local-dev-down  # Delete the local cluster and its data
+```
+
+
 **Quick commands:**
 
 ```sh
