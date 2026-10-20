@@ -65,7 +65,6 @@ for manifest in operator_manifests:
     for container in manifest['spec']['template']['spec']['containers']:
       if container['name'] == 'manager':
         container['image'] = operator_image
-        container['args'].append('--requeue-sql=15m')
   if istio_enabled and manifest['kind'] == 'Namespace':
     manifest['metadata']['labels']['istio-injection'] = 'enabled'
 operator_yaml = encode_yaml_stream(operator_manifests)

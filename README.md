@@ -153,22 +153,20 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contr
 
 ### Local Tilt Development
 
-Requires Go 1.23.x, Docker, kubectl, kind 0.32 or newer, and Tilt. The workflow uses a dedicated `doltdb-local` Kind cluster (Kubernetes 1.36.1) with two nodes:
+Local development requires Go 1.23.x (for `controller-gen` v0.16.1), Docker, kubectl, Kind 0.32 or newer, and Tilt. The workflow uses a dedicated `doltdb-local` Kind cluster (Kubernetes 1.36.1) with two nodes:
 
 - One Kubernetes control-plane node.
 - One worker; `make local-dev-up` labels it `node-role.kubernetes.io/worker` after registration, and the Istio control plane, operator, and DoltDB pods share it.
 
-Kind topology is applied only when a cluster is created. The workflow now uses `doltdb-local`; an existing `dolt-operator-dev` cluster is not renamed or deleted automatically. To remove that old cluster, run `kind delete cluster --name dolt-operator-dev --kubeconfig .local/kubeconfig`; this deletes its data.
+When enabled, the workflow installs the Istio minimal profile and enables automatic sidecar injection for the local operator and DoltDB pods. It uses the caller’s `istioctl` from `PATH`; choose a version compatible with the local Kubernetes version. It does not set a strict mTLS policy.
 
-When enabled, the workflow installs Istio 1.23.6 with the minimal profile and injects sidecars in `doltdb-operator-system` and `default`. It does not set a strict mTLS policy. Istio 1.23 reached end of support in April 2025, and Kubernetes 1.36.1 is outside its supported range.
-
-Istio installation is disabled by default. To enable it, run `make local-dev-up ISTIO_ENABLED=true`. Turning it off does not uninstall Istio from an existing cluster; run `make local-dev-down` to delete the cluster and its data.
+Istio installation is disabled by default. To enable it, ensure `istioctl` is on `PATH` and run `make local-dev-up ISTIO_ENABLED=true`. Turning it off does not uninstall Istio from an existing cluster; run `make local-dev-down` to delete the cluster and its data.
 
 ```sh
 make local-dev-up    # Create/reuse the cluster and start Tilt in this terminal
 ```
 
-The local operator runs two replicas with leader election and `--requeue-sql=15m`. The local DoltDB sample runs two replicas with automatic replication and failover. Its manifest omits `replication.primary.podIndex`; the operator updates that field on failover, and Tilt reapply preserves the operator-selected primary. Both database pods share the worker, so this exercises pod-level replication/failover but not node-loss resilience.
+The local operator runs two replicas with leader election. SQL resources use the default 30-second `--requeue-sql` interval unless a resource specifies its own interval. The local DoltDB sample runs two replicas with automatic replication and failover. Its manifest omits `replication.primary.podIndex`; the operator updates that field on failover, and Tilt reapply preserves the operator-selected primary. Both database pods share the worker, so this exercises pod-level replication/failover but not node-loss resilience.
 
 The two DoltDB containers request 3 CPU and 4GiB of memory in total; their memory limits allow up to 8GiB combined. This excludes Istio sidecars, the operator, and Kubernetes components. Allocate additional CPU and memory to Docker/Kind or pods may remain Pending.
 

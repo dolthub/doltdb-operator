@@ -92,24 +92,18 @@ LOCAL_DEV_KUBECONFIG := .local/kubeconfig
 LOCAL_DEV_OPERATOR_IMAGE ?=
 
 
-ISTIO_VERSION ?= 1.23.6
-ISTIOCTL := $(LOCALBIN)/istioctl-$(ISTIO_VERSION)
+ISTIOCTL ?= istioctl
 ISTIO_ENABLED ?= false
-export ISTIO_ENABLED LOCAL_DEV_OPERATOR_IMAGE LOCAL_DEV_DOLTDB_ENGINE_VERSION
+export ISTIOCTL ISTIO_ENABLED LOCAL_DEV_OPERATOR_IMAGE LOCAL_DEV_DOLTDB_ENGINE_VERSION
 
 
 .PHONY: install-istio
-install-istio: $(ISTIOCTL) ## Install Istio and enable sidecar injection for local workloads.
+install-istio: ## Install Istio and enable sidecar injection for local workloads.
 	$(ISTIOCTL) install --set profile=minimal -y
 	kubectl create namespace doltdb-operator-system --dry-run=client -o yaml | kubectl apply -f -
 	kubectl label namespace doltdb-operator-system istio-injection=enabled --overwrite
 	kubectl label namespace default istio-injection=enabled --overwrite
 
-$(ISTIOCTL): $(LOCALBIN)
-	mkdir -p .local/istio-download
-	cd .local/istio-download && curl -fsSL https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) sh -
-	mv .local/istio-download/istio-$(ISTIO_VERSION)/bin/istioctl $(ISTIOCTL)
-	rm -rf .local/istio-download
 
 .PHONY: local-dev-up
 local-dev-up: ## Start the dedicated local-dev kind cluster and Tilt environment.
