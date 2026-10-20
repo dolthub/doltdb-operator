@@ -33,7 +33,12 @@ if istio_enabled:
     labels=['setup'],
   )
 
-docker_build('localhost:5000/doltdb-operator:local', '.', dockerfile='Dockerfile')
+operator_image = os.getenv('LOCAL_DEV_OPERATOR_IMAGE')
+if operator_image:
+  warn('Using external operator image %s; local build skipped' % operator_image)
+else:
+  operator_image = 'localhost:5000/doltdb-operator:local'
+  docker_build(operator_image, '.', dockerfile='Dockerfile')
 
 # Cluster prerequisites
 k8s_yaml([
@@ -54,10 +59,15 @@ k8s_resource(
 # Operator
 operator_yaml = kustomize('config/default')
 operator_manifests = decode_yaml_stream(operator_yaml)
-if istio_enabled:
-  for manifest in operator_manifests:
-    if manifest['kind'] == 'Namespace':
-      manifest['metadata']['labels']['istio-injection'] = 'enabled'
+for manifest in operator_manifests:
+  if manifest['kind'] == 'Deployment':
+    manifest['spec']['replicas'] = 2
+    for container in manifest['spec']['template']['spec']['containers']:
+      if container['name'] == 'manager':
+        container['image'] = operator_image
+        container['args'].append('--requeue-sql=15m')
+  if istio_enabled and manifest['kind'] == 'Namespace':
+    manifest['metadata']['labels']['istio-injection'] = 'enabled'
 operator_yaml = encode_yaml_stream(operator_manifests)
 k8s_yaml(operator_yaml)
 # Tilt already associates the Deployment and Service with the operator workload.
@@ -78,7 +88,12 @@ k8s_resource(
 )
 
 # DoltDB cluster
-k8s_yaml('hack/manifests/doltdb-local-dev.yaml')
+dolt_engine_version = os.getenv('LOCAL_DEV_DOLTDB_ENGINE_VERSION')
+dolt_manifests = decode_yaml_stream(read_file('hack/manifests/doltdb-local-dev.yaml'))
+for manifest in dolt_manifests:
+  if manifest['kind'] == 'DoltDB' and dolt_engine_version:
+    manifest['spec']['engineVersion'] = dolt_engine_version
+k8s_yaml(encode_yaml_stream(dolt_manifests))
 k8s_resource(
   new_name='DoltDB Cluster',
   objects=['dolt:doltdb'],

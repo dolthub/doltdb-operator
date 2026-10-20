@@ -89,10 +89,14 @@ add-copyright:
 
 LOCAL_DEV_CLUSTER := doltdb-local
 LOCAL_DEV_KUBECONFIG := .local/kubeconfig
+LOCAL_DEV_OPERATOR_IMAGE ?=
+
 
 ISTIO_VERSION ?= 1.23.6
 ISTIOCTL := $(LOCALBIN)/istioctl-$(ISTIO_VERSION)
 ISTIO_ENABLED ?= true
+export ISTIO_ENABLED LOCAL_DEV_OPERATOR_IMAGE LOCAL_DEV_DOLTDB_ENGINE_VERSION
+
 
 .PHONY: install-istio
 install-istio: $(ISTIOCTL) ## Install Istio and enable sidecar injection for local workloads.
@@ -100,10 +104,6 @@ install-istio: $(ISTIOCTL) ## Install Istio and enable sidecar injection for loc
 	kubectl create namespace doltdb-operator-system --dry-run=client -o yaml | kubectl apply -f -
 	kubectl label namespace doltdb-operator-system istio-injection=enabled --overwrite
 	kubectl label namespace default istio-injection=enabled --overwrite
-	@if kubectl get deployment doltdb-operator-controller-manager -n doltdb-operator-system >/dev/null 2>&1; then \
-	  kubectl rollout restart deployment doltdb-operator-controller-manager -n doltdb-operator-system; \
-	fi
-	kubectl delete pod dolt-0 -n default --ignore-not-found
 
 $(ISTIOCTL): $(LOCALBIN)
 	mkdir -p .local/istio-download
@@ -120,7 +120,7 @@ local-dev-up: ## Start the dedicated local-dev kind cluster and Tilt environment
 
 	kind export kubeconfig --name "$(LOCAL_DEV_CLUSTER)" --kubeconfig "$(LOCAL_DEV_KUBECONFIG)"
 	KUBECONFIG="$(LOCAL_DEV_KUBECONFIG)" kubectl label node "$(LOCAL_DEV_CLUSTER)-worker" node-role.kubernetes.io/worker=worker --overwrite
-	KUBECONFIG="$(LOCAL_DEV_KUBECONFIG)" ISTIO_ENABLED="$(ISTIO_ENABLED)" tilt up -f Tiltfile.dev
+	KUBECONFIG="$(LOCAL_DEV_KUBECONFIG)" tilt up -f Tiltfile.dev
 
 .PHONY: local-dev-down
 local-dev-down: ## Delete the dedicated local-dev cluster; stop Tilt with Ctrl+C first.

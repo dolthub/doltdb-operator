@@ -168,6 +168,23 @@ Istio installation is enabled by default. To skip it when you create a fresh loc
 make local-dev-up    # Create/reuse the cluster and start Tilt in this terminal
 ```
 
+The local operator runs two replicas with leader election and `--requeue-sql=15m`. The local DoltDB sample runs two replicas with automatic replication and failover. Its manifest omits `replication.primary.podIndex`; the operator updates that field on failover, and Tilt reapply preserves the operator-selected primary. Both database pods share the worker, so this exercises pod-level replication/failover but not node-loss resilience.
+
+The two DoltDB containers request 3 CPU and 4GiB of memory in total; their memory limits allow up to 8GiB combined. This excludes Istio sidecars, the operator, and Kubernetes components. Allocate additional CPU and memory to Docker/Kind or pods may remain Pending.
+
+The operator is built from this checkout by default. The Dolt engine default (`2.4.1`) lives in the local DoltDB manifest; set `LOCAL_DEV_DOLTDB_ENGINE_VERSION` to a compatible published tag to override it. A nonempty `LOCAL_DEV_OPERATOR_IMAGE` skips the local operator build and produces a Tilt warning. For a custom local image, build/tag it first. On a fresh cluster, create the cluster before loading the image; skip the create command if `doltdb-local` already exists:
+
+```sh
+export LOCAL_DEV_OPERATOR_IMAGE=localhost:5000/doltdb-operator:dev
+docker build -t "$LOCAL_DEV_OPERATOR_IMAGE" .
+mkdir -p .local
+kind create cluster --name doltdb-local --config hack/manifests/kind/kind-local-dev.yaml --kubeconfig .local/kubeconfig
+kind load docker-image "$LOCAL_DEV_OPERATOR_IMAGE" --name doltdb-local
+make local-dev-up LOCAL_DEV_OPERATOR_IMAGE="$LOCAL_DEV_OPERATOR_IMAGE" LOCAL_DEV_DOLTDB_ENGINE_VERSION=2.4.2
+```
+
+For a registry image, use a pullable immutable digest such as `registry.example/doltdb-operator@sha256:…`. Choose an engine tag compatible with the existing database data.
+
 To access the cluster from another terminal, merge the isolated kubeconfig into `kubectl`'s configuration for that shell:
 
 ```sh
