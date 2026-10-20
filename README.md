@@ -155,6 +155,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contr
 
 Requires Go 1.23.x, Docker, kubectl, kind 0.32 or newer, and Tilt. The workflow uses a dedicated `dolt-operator-dev` kind cluster (Kubernetes 1.36.1) and DoltDB engine 2.4.1. Its isolated kubeconfig is stored at `.local/kubeconfig` in the repository and does not change the current kubectl context.
 
+The workflow installs Istio 1.23.6 with the minimal profile. It enables sidecar injection in `doltdb-operator-system` and `default`. It does not set a strict mTLS policy. Istio 1.23 reached end of support in April 2025, and Kubernetes 1.36.1 is outside its supported range.
+
+Istio installation is enabled by default. To skip it when you create a fresh local cluster, run `make local-dev-up ISTIO_ENABLED=false`. This flag does not uninstall Istio from an existing cluster. To change an existing cluster, run `make local-dev-down` first. This deletes the cluster and its data.
+
 ```sh
 make local-dev-up    # Create/reuse the cluster and start Tilt in this terminal
 ```

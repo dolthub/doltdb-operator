@@ -1,16 +1,18 @@
 # Local setup
 make_deps = ['Makefile', 'make']
 codegen_deps = make_deps + ['api']
+istio_enabled = os.getenv('ISTIO_ENABLED') != 'false'
 
 # Ignore generated output to prevent code generation from retriggering itself.
 codegen_ignores = ['api/v1alpha/zz_generated.deepcopy.go']
 
-local_resource('Kustomize installation', cmd='make kustomize', deps=make_deps)
+local_resource('Kustomize installation', cmd='make kustomize', deps=make_deps, labels=['setup'])
 local_resource(
   'DeepCopy generation',
   cmd='make generate',
   deps=codegen_deps,
   ignore=codegen_ignores,
+  labels=['setup'],
 )
 # make install runs make manifests before applying the CRDs.
 local_resource(
@@ -19,7 +21,17 @@ local_resource(
   deps=codegen_deps,
   ignore=codegen_ignores,
   resource_deps=['Kustomize installation', 'DeepCopy generation'],
+  labels=['setup'],
 )
+
+if istio_enabled:
+  local_resource(
+    'Istio installation',
+    cmd='make install-istio',
+    deps=['Makefile', 'make/dev.mk'],
+    resource_deps=['CRD installation'],
+    labels=['setup'],
+  )
 
 docker_build('localhost:5000/doltdb-operator:local', '.', dockerfile='Dockerfile')
 
@@ -36,10 +48,17 @@ k8s_resource(
     'dolt-credentials:secret',
   ],
   new_name='DoltDB Prerequisites',
+  labels=['platform'],
 )
 
 # Operator
 operator_yaml = kustomize('config/default')
+operator_manifests = decode_yaml_stream(operator_yaml)
+if istio_enabled:
+  for manifest in operator_manifests:
+    if manifest['kind'] == 'Namespace':
+      manifest['metadata']['labels']['istio-injection'] = 'enabled'
+operator_yaml = encode_yaml_stream(operator_manifests)
 k8s_yaml(operator_yaml)
 # Tilt already associates the Deployment and Service with the operator workload.
 operator_objects = [
@@ -47,11 +66,15 @@ operator_objects = [
   for obj in decode_yaml_stream(operator_yaml)
   if obj['kind'] not in ['Deployment', 'Service']
 ]
+operator_resource_deps = ['CRD installation']
+if istio_enabled:
+  operator_resource_deps = operator_resource_deps + ['Istio installation']
 k8s_resource(
   workload='doltdb-operator-controller-manager',
   objects=operator_objects,
   new_name='DoltDB Operator',
-  resource_deps=['CRD installation'],
+  resource_deps=operator_resource_deps,
+  labels=['platform'],
 )
 
 # DoltDB cluster
@@ -60,4 +83,5 @@ k8s_resource(
   new_name='DoltDB Cluster',
   objects=['dolt:doltdb'],
   resource_deps=['DoltDB Prerequisites', 'DoltDB Operator'],
+  labels=['database'],
 )

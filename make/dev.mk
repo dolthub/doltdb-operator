@@ -90,6 +90,27 @@ add-copyright:
 LOCAL_DEV_CLUSTER := dolt-operator-dev
 LOCAL_DEV_KUBECONFIG := .local/kubeconfig
 
+ISTIO_VERSION ?= 1.23.6
+ISTIOCTL := $(LOCALBIN)/istioctl-$(ISTIO_VERSION)
+ISTIO_ENABLED ?= true
+
+.PHONY: install-istio
+install-istio: $(ISTIOCTL) ## Install Istio and enable sidecar injection for local workloads.
+	$(ISTIOCTL) install --set profile=minimal -y
+	kubectl create namespace doltdb-operator-system --dry-run=client -o yaml | kubectl apply -f -
+	kubectl label namespace doltdb-operator-system istio-injection=enabled --overwrite
+	kubectl label namespace default istio-injection=enabled --overwrite
+	@if kubectl get deployment doltdb-operator-controller-manager -n doltdb-operator-system >/dev/null 2>&1; then \
+	  kubectl rollout restart deployment doltdb-operator-controller-manager -n doltdb-operator-system; \
+	fi
+	kubectl delete pod dolt-0 -n default --ignore-not-found
+
+$(ISTIOCTL): $(LOCALBIN)
+	mkdir -p .local/istio-download
+	cd .local/istio-download && curl -fsSL https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) sh -
+	mv .local/istio-download/istio-$(ISTIO_VERSION)/bin/istioctl $(ISTIOCTL)
+	rm -rf .local/istio-download
+
 .PHONY: local-dev-up
 local-dev-up: ## Start the dedicated local-dev kind cluster and Tilt environment.
 	@go version | grep -Eq '^go version go1\.23\.' || { echo "local dev requires Go 1.23.x for controller-gen v0.16.1" >&2; exit 1; }
@@ -98,7 +119,7 @@ local-dev-up: ## Start the dedicated local-dev kind cluster and Tilt environment
 	kind get clusters | grep -Fxq "$(LOCAL_DEV_CLUSTER)" || kind create cluster --name "$(LOCAL_DEV_CLUSTER)" --config hack/manifests/kind/kind-local-dev.yaml --kubeconfig "$(LOCAL_DEV_KUBECONFIG)"
 
 	kind export kubeconfig --name "$(LOCAL_DEV_CLUSTER)" --kubeconfig "$(LOCAL_DEV_KUBECONFIG)"
-	KUBECONFIG="$(LOCAL_DEV_KUBECONFIG)" tilt up -f Tiltfile.dev
+	KUBECONFIG="$(LOCAL_DEV_KUBECONFIG)" ISTIO_ENABLED="$(ISTIO_ENABLED)" tilt up -f Tiltfile.dev
 
 .PHONY: local-dev-down
 local-dev-down: ## Delete the dedicated local-dev cluster; stop Tilt with Ctrl+C first.
