@@ -160,9 +160,9 @@ Requires Go 1.23.x, Docker, kubectl, kind 0.32 or newer, and Tilt. The workflow 
 
 Kind topology is applied only when a cluster is created. The workflow now uses `doltdb-local`; an existing `dolt-operator-dev` cluster is not renamed or deleted automatically. To remove that old cluster, run `kind delete cluster --name dolt-operator-dev --kubeconfig .local/kubeconfig`; this deletes its data.
 
-The workflow installs Istio 1.23.6 with the minimal profile. It enables sidecar injection in `doltdb-operator-system` and `default`. It does not set a strict mTLS policy. Istio 1.23 reached end of support in April 2025, and Kubernetes 1.36.1 is outside its supported range.
+When enabled, the workflow installs Istio 1.23.6 with the minimal profile and injects sidecars in `doltdb-operator-system` and `default`. It does not set a strict mTLS policy. Istio 1.23 reached end of support in April 2025, and Kubernetes 1.36.1 is outside its supported range.
 
-Istio installation is enabled by default. To skip it when you create a fresh local cluster, run `make local-dev-up ISTIO_ENABLED=false`. This flag does not uninstall Istio from an existing cluster. To change an existing cluster, run `make local-dev-down` first. This deletes the cluster and its data.
+Istio installation is disabled by default. To enable it, run `make local-dev-up ISTIO_ENABLED=true`. Turning it off does not uninstall Istio from an existing cluster; run `make local-dev-down` to delete the cluster and its data.
 
 ```sh
 make local-dev-up    # Create/reuse the cluster and start Tilt in this terminal

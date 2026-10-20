@@ -1,7 +1,7 @@
 # Local setup
 make_deps = ['Makefile', 'make']
 codegen_deps = make_deps + ['api']
-istio_enabled = os.getenv('ISTIO_ENABLED') != 'false'
+istio_enabled = os.getenv('ISTIO_ENABLED') == 'true'
 
 # Ignore generated output to prevent code generation from retriggering itself.
 codegen_ignores = ['api/v1alpha/zz_generated.deepcopy.go']
