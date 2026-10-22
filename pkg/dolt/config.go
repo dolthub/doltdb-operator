@@ -23,6 +23,14 @@ type Config struct {
 	Listener  Listener   `yaml:"listener"`
 	Metrics   Metrics    `yaml:"metrics,omitempty"`
 	MCPServer *MCPServer `yaml:"mcp_server,omitempty"`
+	// RemotesAPI is the user-facing remotes API, separate from Cluster.RemotesAPI.
+	RemotesAPI *UserRemotesAPI `yaml:"remotesapi,omitempty"`
+}
+
+// UserRemotesAPI represents the top-level remotesapi section of the configuration.
+type UserRemotesAPI struct {
+	Port     int32 `yaml:"port"`
+	ReadOnly bool  `yaml:"read_only,omitempty"`
 }
 
 // MCPServer represents the mcp_server section of the configuration.
@@ -35,6 +43,7 @@ type MCPServer struct {
 
 type Behavior struct {
 	AutoGCBehavior AutoGCBehavior `yaml:"auto_gc_behavior"`
+	EventScheduler string         `yaml:"event_scheduler,omitempty"`
 }
 
 type AutoGCBehavior struct {

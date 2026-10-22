@@ -26,6 +26,13 @@ func doltServicePorts(doltdb *doltv1alpha.DoltDB) []v1.ServicePort {
 		})
 	}
 
+	if doltdb.Spec.Server.RemotesAPI != nil {
+		ports = append(ports, v1.ServicePort{
+			Port: doltdb.Spec.Server.RemotesAPI.Port,
+			Name: DoltUserRemotesAPIPortName,
+		})
+	}
+
 	return ports
 }
 
@@ -46,6 +53,13 @@ func doltInternalServicePorts(doltdb *doltv1alpha.DoltDB) []v1.ServicePort {
 		ports = append(ports, v1.ServicePort{
 			Port: doltdb.Spec.Server.MCPServer.Port,
 			Name: DoltMCPPortName,
+		})
+	}
+
+	if doltdb.Spec.Server.RemotesAPI != nil {
+		ports = append(ports, v1.ServicePort{
+			Port: doltdb.Spec.Server.RemotesAPI.Port,
+			Name: DoltUserRemotesAPIPortName,
 		})
 	}
 

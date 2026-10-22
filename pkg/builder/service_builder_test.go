@@ -578,3 +578,33 @@ func TestBuildDoltReaderService(t *testing.T) {
 		})
 	}
 }
+
+func TestDoltServicePortsRemotesAPI(t *testing.T) {
+	doltdb := &doltv1alpha.DoltDB{
+		ObjectMeta: metav1.ObjectMeta{Name: "doltdb-remotes", Namespace: "default"},
+		Spec: doltv1alpha.DoltDBSpec{
+			Server: doltv1alpha.Server{
+				Listener:   doltv1alpha.Listener{Port: 3306},
+				Cluster:    doltv1alpha.Cluster{RemotesAPI: doltv1alpha.RemotesAPI{Port: 50051}},
+				RemotesAPI: &doltv1alpha.ServerRemotesAPI{Port: 50052},
+			},
+		},
+	}
+	expected := []corev1.ServicePort{
+		{Port: 3306, Name: DoltMySQLPortName},
+		{Port: 50052, Name: DoltUserRemotesAPIPortName},
+	}
+	ports := doltServicePorts(doltdb)
+	if len(ports) != len(expected) {
+		t.Fatalf("expected %d ports, got %d: %v", len(expected), len(ports), ports)
+	}
+	for i := range expected {
+		if ports[i].Port != expected[i].Port || ports[i].Name != expected[i].Name {
+			t.Errorf("port %d: expected %s %d, got %s %d", i, expected[i].Name, expected[i].Port, ports[i].Name, ports[i].Port)
+		}
+	}
+	internal := doltInternalServicePorts(doltdb)
+	if len(internal) != 3 || internal[2].Port != 50052 || internal[2].Name != DoltUserRemotesAPIPortName {
+		t.Errorf("internal service ports: expected the remotes API port last, got %v", internal)
+	}
+}

@@ -180,3 +180,36 @@ func TestDoltContainerPortsMCP(t *testing.T) {
 		})
 	}
 }
+
+func TestDoltContainerPortsRemotesAPI(t *testing.T) {
+	without := &doltv1alpha.DoltDB{
+		Spec: doltv1alpha.DoltDBSpec{
+			Server: doltv1alpha.Server{
+				Listener: doltv1alpha.Listener{Port: 3306},
+			},
+		},
+	}
+	for _, p := range doltContainerPorts(without) {
+		if p.Name == DoltUserRemotesAPIPortName {
+			t.Errorf("unexpected remotes API container port %d", p.ContainerPort)
+		}
+	}
+
+	with := &doltv1alpha.DoltDB{
+		Spec: doltv1alpha.DoltDBSpec{
+			Server: doltv1alpha.Server{
+				Listener:   doltv1alpha.Listener{Port: 3306},
+				RemotesAPI: &doltv1alpha.ServerRemotesAPI{Port: 50052},
+			},
+		},
+	}
+	var found *int32
+	for _, p := range doltContainerPorts(with) {
+		if p.Name == DoltUserRemotesAPIPortName {
+			found = &p.ContainerPort
+		}
+	}
+	if found == nil || *found != 50052 {
+		t.Fatalf("expected remotes API container port 50052, got %v", found)
+	}
+}

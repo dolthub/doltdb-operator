@@ -26,6 +26,12 @@ type Server struct {
 	// endpoint is started alongside the SQL server.
 	// +optional
 	MCPServer *MCPServer `json:"mcpServer,omitempty"`
+	// RemotesAPI enables Dolt's user-facing remotes API, which serves clone, fetch
+	// and push of the server's databases. When set, it is started alongside the SQL
+	// server and exposed on the Services. It is separate from Cluster.RemotesAPI,
+	// which carries replication traffic.
+	// +optional
+	RemotesAPI *ServerRemotesAPI `json:"remotesAPI,omitempty"`
 }
 
 type Profiler struct {
@@ -39,6 +45,11 @@ type Behavior struct {
 	// AutoGCBehavior defines the auto GC behavior for the DoltDB server.
 	// +optional
 	AutoGCBehavior AutoGCBehavior `json:"autoGCBehavior,omitempty"`
+	// EventScheduler sets the server's event scheduler. When empty, Dolt's default
+	// applies, which is ON.
+	// +kubebuilder:validation:Enum=ON;OFF
+	// +optional
+	EventScheduler string `json:"eventScheduler,omitempty"`
 }
 
 type AutoGCBehavior struct {
@@ -98,6 +109,25 @@ type RemotesAPI struct {
 	Port int32 `json:"port,omitempty"`
 }
 
+// ServerRemotesAPI defines Dolt's user-facing remotes API.
+type ServerRemotesAPI struct {
+	// Port defines the port for the remotes API.
+	// +kubebuilder:validation:Minimum=1024
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:default:=50052
+	// +optional
+	Port int32 `json:"port,omitempty"`
+	// ReadOnly makes the remotes API refuse pushes.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+func (r *ServerRemotesAPI) ApplyDefaults() {
+	if r.Port == 0 {
+		r.Port = 50052
+	}
+}
+
 // MCPServer defines the MCP server configuration for the DoltDB server.
 type MCPServer struct {
 	// Port defines the HTTP port for the MCP server.
@@ -139,6 +169,9 @@ func (s *Server) ApplyDefaults() {
 	s.Cluster.ApplyDefaults()
 	if s.MCPServer != nil {
 		s.MCPServer.ApplyDefaults()
+	}
+	if s.RemotesAPI != nil {
+		s.RemotesAPI.ApplyDefaults()
 	}
 }
 

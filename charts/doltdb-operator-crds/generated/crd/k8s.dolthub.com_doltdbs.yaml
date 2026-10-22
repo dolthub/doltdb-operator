@@ -1863,6 +1863,14 @@ spec:
                             description: Enable is a flag to enable the auto GC behavior.
                             type: boolean
                         type: object
+                      eventScheduler:
+                        description: |-
+                          EventScheduler sets the server's event scheduler. When empty, Dolt's default
+                          applies, which is ON.
+                        enum:
+                        - "ON"
+                        - "OFF"
+                        type: string
                     type: object
                   cluster:
                     description: Cluster defines the cluster configuration for the
@@ -1971,6 +1979,24 @@ spec:
                       enablePProf:
                         default: false
                         description: Enabled is a flag to enable the profiler.
+                        type: boolean
+                    type: object
+                  remotesAPI:
+                    description: |-
+                      RemotesAPI enables Dolt's user-facing remotes API, which serves clone, fetch
+                      and push of the server's databases. When set, it is started alongside the SQL
+                      server and exposed on the Services. It is separate from Cluster.RemotesAPI,
+                      which carries replication traffic.
+                    properties:
+                      port:
+                        default: 50052
+                        description: Port defines the port for the remotes API.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1024
+                        type: integer
+                      readOnly:
+                        description: ReadOnly makes the remotes API refuse pushes.
                         type: boolean
                     type: object
                 type: object

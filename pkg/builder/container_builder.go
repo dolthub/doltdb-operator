@@ -21,6 +21,9 @@ const (
 	DoltMetricsPortName    = "http-metrics"
 	DoltProfilerPortName   = "http-profiler"
 	DoltMCPPortName        = "http-mcp"
+	// DoltUserRemotesAPIPortName names the user-facing remotes API port, which serves
+	// gRPC and plain HTTP table-file transfers on one port.
+	DoltUserRemotesAPIPortName = "http-remotesapi"
 
 	DoltDataVolume   = "dolt-data"
 	DoltConfigVolume = "dolt-config"
@@ -142,6 +145,13 @@ func doltContainerPorts(doltdb *doltv1alpha.DoltDB) []corev1.ContainerPort {
 		ports = append(ports, corev1.ContainerPort{
 			ContainerPort: doltdb.Spec.Server.MCPServer.Port,
 			Name:          DoltMCPPortName,
+		})
+	}
+
+	if doltdb.Spec.Server.RemotesAPI != nil {
+		ports = append(ports, corev1.ContainerPort{
+			ContainerPort: doltdb.Spec.Server.RemotesAPI.Port,
+			Name:          DoltUserRemotesAPIPortName,
 		})
 	}
 
