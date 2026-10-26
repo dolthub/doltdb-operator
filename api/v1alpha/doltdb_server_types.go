@@ -2,6 +2,13 @@
 
 package v1alpha
 
+// The user-facing remotes API port must not collide with any other port the server listens on.
+// Defaults are spelled out because an omitted parent object is not defaulted.
+// +kubebuilder:validation:XValidation:rule="!has(self.remotesAPI) || self.remotesAPI.port != (has(self.listener) && has(self.listener.port) ? self.listener.port : 3306)",message="remotesAPI.port must differ from listener.port"
+// +kubebuilder:validation:XValidation:rule="!has(self.remotesAPI) || self.remotesAPI.port != (has(self.cluster) && has(self.cluster.remotesAPI) && has(self.cluster.remotesAPI.port) ? self.cluster.remotesAPI.port : 50051)",message="remotesAPI.port must differ from cluster.remotesAPI.port"
+// +kubebuilder:validation:XValidation:rule="!has(self.remotesAPI) || !has(self.mcpServer) || self.remotesAPI.port != (has(self.mcpServer.port) ? self.mcpServer.port : 7007)",message="remotesAPI.port must differ from mcpServer.port"
+// +kubebuilder:validation:XValidation:rule="!has(self.remotesAPI) || !has(self.metrics) || !has(self.metrics.enabled) || !self.metrics.enabled || self.remotesAPI.port != (has(self.metrics.port) ? self.metrics.port : 11228)",message="remotesAPI.port must differ from metrics.port"
+// +kubebuilder:validation:XValidation:rule="!has(self.remotesAPI) || !has(self.profiler) || !has(self.profiler.enablePProf) || !self.profiler.enablePProf || self.remotesAPI.port != 6060",message="remotesAPI.port must differ from the profiler port 6060"
 type Server struct {
 	// Profiler defines the profiler configuration for the DoltDB server.
 	// +optional
@@ -28,8 +35,16 @@ type Server struct {
 	MCPServer *MCPServer `json:"mcpServer,omitempty"`
 	// RemotesAPI enables Dolt's user-facing remotes API, which serves clone, fetch
 	// and push of the server's databases. When set, it is started alongside the SQL
-	// server and exposed on the Services. It is separate from Cluster.RemotesAPI,
-	// which carries replication traffic.
+	// server. It is separate from Cluster.RemotesAPI, which carries replication traffic.
+	//
+	// The port is exposed on the standalone Service, or on the primary Service when
+	// replication is enabled. It is not exposed on the reader Service, because Dolt
+	// does not refuse pushes to a standby through this API.
+	//
+	// Clients authenticate with HTTP Basic credentials of a SQL user. Reads require
+	// the CLONE_ADMIN privilege and pushes require SUPER. Credentials are sent in
+	// plaintext, so the port should only be reachable over an encrypted network
+	// (e.g. a service mesh) and restricted with a NetworkPolicy.
 	// +optional
 	RemotesAPI *ServerRemotesAPI `json:"remotesAPI,omitempty"`
 }

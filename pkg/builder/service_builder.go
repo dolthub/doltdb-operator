@@ -10,8 +10,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// doltServicePorts returns the service ports for the Dolt cluster.
-func doltServicePorts(doltdb *doltv1alpha.DoltDB) []v1.ServicePort {
+// doltServicePorts returns the service ports for the Dolt cluster. The user-facing remotes API port is
+// only added when withRemotesAPI is set, i.e. for Services that never route to a standby: Dolt does not
+// refuse pushes to a standby through that API.
+func doltServicePorts(doltdb *doltv1alpha.DoltDB, withRemotesAPI bool) []v1.ServicePort {
 	ports := []v1.ServicePort{
 		{
 			Port: doltdb.Spec.Server.Listener.Port,
@@ -26,7 +28,7 @@ func doltServicePorts(doltdb *doltv1alpha.DoltDB) []v1.ServicePort {
 		})
 	}
 
-	if doltdb.Spec.Server.RemotesAPI != nil {
+	if withRemotesAPI && doltdb.Spec.Server.RemotesAPI != nil {
 		ports = append(ports, v1.ServicePort{
 			Port: doltdb.Spec.Server.RemotesAPI.Port,
 			Name: DoltUserRemotesAPIPortName,
@@ -53,13 +55,6 @@ func doltInternalServicePorts(doltdb *doltv1alpha.DoltDB) []v1.ServicePort {
 		ports = append(ports, v1.ServicePort{
 			Port: doltdb.Spec.Server.MCPServer.Port,
 			Name: DoltMCPPortName,
-		})
-	}
-
-	if doltdb.Spec.Server.RemotesAPI != nil {
-		ports = append(ports, v1.ServicePort{
-			Port: doltdb.Spec.Server.RemotesAPI.Port,
-			Name: DoltUserRemotesAPIPortName,
 		})
 	}
 
@@ -99,7 +94,7 @@ func (b *Builder) BuildDoltService(doltdb *doltv1alpha.DoltDB) (*v1.Service, err
 	svc := &v1.Service{
 		ObjectMeta: objMeta,
 		Spec: v1.ServiceSpec{
-			Ports:    doltServicePorts(doltdb),
+			Ports:    doltServicePorts(doltdb, true),
 			Type:     v1.ServiceTypeClusterIP,
 			Selector: labels,
 		},
@@ -126,7 +121,7 @@ func (b *Builder) BuildDoltPrimaryService(doltdb *doltv1alpha.DoltDB) (*v1.Servi
 	svc := &v1.Service{
 		ObjectMeta: objMeta,
 		Spec: v1.ServiceSpec{
-			Ports:    doltServicePorts(doltdb),
+			Ports:    doltServicePorts(doltdb, true),
 			Type:     v1.ServiceTypeClusterIP,
 			Selector: labels,
 		},
@@ -149,7 +144,7 @@ func (b *Builder) BuildDoltReaderService(doltdb *doltv1alpha.DoltDB) (*v1.Servic
 	svc := &v1.Service{
 		ObjectMeta: objMeta,
 		Spec: v1.ServiceSpec{
-			Ports:    doltServicePorts(doltdb),
+			Ports:    doltServicePorts(doltdb, false),
 			Type:     v1.ServiceTypeClusterIP,
 			Selector: labels,
 		},

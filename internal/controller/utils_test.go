@@ -129,6 +129,7 @@ func testCreateInitialData(ctx context.Context) {
 						"env": "integration-test",
 					},
 				},
+				RemotesAPI: &doltv1alpha.ServerRemotesAPI{},
 			},
 			GlobalConfig: doltv1alpha.GlobalConfig{
 				DisableClientUsageMetricsCollection: ptr.To(false),
