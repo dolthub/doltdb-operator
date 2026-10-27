@@ -180,3 +180,58 @@ func TestDoltContainerPortsMCP(t *testing.T) {
 		})
 	}
 }
+
+func TestDoltContainerPortsRemotesAPI(t *testing.T) {
+	tests := []struct {
+		name         string
+		remotesAPI   *doltv1alpha.ServerRemotesAPI
+		expectedPort int32
+	}{
+		{
+			name: "remotes API disabled - no remotes API port",
+		},
+		{
+			name:         "remotes API enabled - default port",
+			remotesAPI:   &doltv1alpha.ServerRemotesAPI{Port: 50052},
+			expectedPort: 50052,
+		},
+		{
+			name:         "remotes API enabled - custom port",
+			remotesAPI:   &doltv1alpha.ServerRemotesAPI{Port: 9000, ReadOnly: true},
+			expectedPort: 9000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doltdb := &doltv1alpha.DoltDB{
+				Spec: doltv1alpha.DoltDBSpec{
+					Server: doltv1alpha.Server{
+						Listener:   doltv1alpha.Listener{Port: 3306},
+						RemotesAPI: tt.remotesAPI,
+					},
+				},
+			}
+
+			var remotesPort *int32
+			for _, p := range doltContainerPorts(doltdb) {
+				if p.Name == DoltUserRemotesAPIPortName {
+					remotesPort = &p.ContainerPort
+				}
+			}
+
+			if tt.expectedPort == 0 {
+				if remotesPort != nil {
+					t.Errorf("unexpected remotes API container port %d", *remotesPort)
+				}
+				return
+			}
+			if remotesPort == nil {
+				t.Fatal("expected remotes API container port, not found")
+			}
+			if *remotesPort != tt.expectedPort {
+				t.Errorf("remotes API port: expected %d, got %d", tt.expectedPort, *remotesPort)
+			}
+		})
+	}
+}

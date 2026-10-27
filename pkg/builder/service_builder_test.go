@@ -109,7 +109,7 @@ func TestDoltServicePorts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ports := doltServicePorts(tt.doltdb)
+			ports := doltServicePorts(tt.doltdb, true)
 
 			if len(ports) != len(tt.expectedPorts) {
 				t.Fatalf("expected %d ports, got %d", len(tt.expectedPorts), len(ports))
@@ -574,6 +574,104 @@ func TestBuildDoltReaderService(t *testing.T) {
 
 			if !hasMySQL {
 				t.Errorf("service missing MySQL port with name %s", DoltMySQLPortName)
+			}
+		})
+	}
+}
+
+func TestServicesRemotesAPIPort(t *testing.T) {
+	builder := newTestBuilder()
+
+	newDoltDB := func(remotesAPI *doltv1alpha.ServerRemotesAPI) *doltv1alpha.DoltDB {
+		return &doltv1alpha.DoltDB{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "doltdb-remotes",
+				Namespace: "default",
+			},
+			Spec: doltv1alpha.DoltDBSpec{
+				Server: doltv1alpha.Server{
+					Listener: doltv1alpha.Listener{Port: 3306},
+					Cluster: doltv1alpha.Cluster{
+						RemotesAPI: doltv1alpha.RemotesAPI{Port: 50051},
+					},
+					RemotesAPI: remotesAPI,
+				},
+			},
+			Status: doltv1alpha.DoltDBStatus{
+				CurrentPrimaryPodIndex: ptr.To(0),
+			},
+		}
+	}
+	builders := map[string]func(*doltv1alpha.DoltDB) (*corev1.Service, error){
+		"standalone": builder.BuildDoltService,
+		"primary":    builder.BuildDoltPrimaryService,
+		"reader":     builder.BuildDoltReaderService,
+		"internal":   builder.BuildDoltInternalService,
+	}
+
+	tests := []struct {
+		name         string
+		service      string
+		remotesAPI   *doltv1alpha.ServerRemotesAPI
+		expectedPort int32
+	}{
+		{
+			name:         "standalone service exposes the remotes API",
+			service:      "standalone",
+			remotesAPI:   &doltv1alpha.ServerRemotesAPI{Port: 50052},
+			expectedPort: 50052,
+		},
+		{
+			name:         "primary service exposes the remotes API on a custom port",
+			service:      "primary",
+			remotesAPI:   &doltv1alpha.ServerRemotesAPI{Port: 9000},
+			expectedPort: 9000,
+		},
+		{
+			name:       "reader service does not expose the remotes API",
+			service:    "reader",
+			remotesAPI: &doltv1alpha.ServerRemotesAPI{Port: 50052},
+		},
+		{
+			name:       "internal service does not expose the remotes API",
+			service:    "internal",
+			remotesAPI: &doltv1alpha.ServerRemotesAPI{Port: 50052},
+		},
+		{
+			name:    "standalone service without remotes API",
+			service: "standalone",
+		},
+		{
+			name:    "primary service without remotes API",
+			service: "primary",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, err := builders[tt.service](newDoltDB(tt.remotesAPI))
+			if err != nil {
+				t.Fatalf("unexpected error building %s service: %v", tt.service, err)
+			}
+
+			var remotesPort *corev1.ServicePort
+			for i := range svc.Spec.Ports {
+				if svc.Spec.Ports[i].Name == DoltUserRemotesAPIPortName {
+					remotesPort = &svc.Spec.Ports[i]
+				}
+			}
+
+			if tt.expectedPort == 0 {
+				if remotesPort != nil {
+					t.Errorf("unexpected remotes API port %d on %s service", remotesPort.Port, tt.service)
+				}
+				return
+			}
+			if remotesPort == nil {
+				t.Fatalf("expected remotes API port on %s service, not found", tt.service)
+			}
+			if remotesPort.Port != tt.expectedPort {
+				t.Errorf("remotes API port: expected %d, got %d", tt.expectedPort, remotesPort.Port)
 			}
 		})
 	}

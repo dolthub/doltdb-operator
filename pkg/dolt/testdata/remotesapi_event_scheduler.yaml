@@ -1,0 +1,13 @@
+test-cluster-0.yaml:
+  behavior:
+    auto_gc_behavior:
+      enable: false
+    event_scheduler: "OFF"
+  log_level: trace
+  listener:
+    host: 0.0.0.0
+    max_connections: 128
+    port: 3306
+  remotesapi:
+    port: 50052
+    read_only: true

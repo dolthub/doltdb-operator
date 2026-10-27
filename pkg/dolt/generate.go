@@ -28,6 +28,7 @@ func GenerateConfigMapData(doltdb *doltv1alpha.DoltDB) (map[string]string, error
 				AutoGCBehavior: AutoGCBehavior{
 					Enable: doltdb.Spec.Server.Behavior.AutoGCBehavior.Enable,
 				},
+				EventScheduler: doltdb.Spec.Server.Behavior.EventScheduler,
 			},
 			LogLevel: doltdb.Spec.Server.LogLevel,
 			Listener: Listener{
@@ -67,6 +68,13 @@ func GenerateConfigMapData(doltdb *doltv1alpha.DoltDB) (map[string]string, error
 				User:     user,
 				Password: "${DOLT_MCP_PASSWORD}",
 				Database: mcp.Database,
+			}
+		}
+
+		if doltdb.Spec.Server.RemotesAPI != nil {
+			config.RemotesAPI = &UserRemotesAPI{
+				Port:     doltdb.Spec.Server.RemotesAPI.Port,
+				ReadOnly: doltdb.Spec.Server.RemotesAPI.ReadOnly,
 			}
 		}
 

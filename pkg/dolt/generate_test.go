@@ -238,6 +238,35 @@ func TestGenerateConfigMapData(t *testing.T) {
 			expectedData:  readTestData(t, "mcp_server_default_creds.yaml"),
 			expectedError: false,
 		},
+		{
+			name: "with user-facing remotes API and event scheduler",
+			doltdb: &doltv1alpha.DoltDB{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "default",
+				},
+				Spec: doltv1alpha.DoltDBSpec{
+					Replicas: 1,
+					Server: doltv1alpha.Server{
+						Behavior: doltv1alpha.Behavior{
+							EventScheduler: "OFF",
+						},
+						Listener: doltv1alpha.Listener{
+							Host:           "0.0.0.0",
+							Port:           3306,
+							MaxConnections: 128,
+						},
+						RemotesAPI: &doltv1alpha.ServerRemotesAPI{
+							Port:     50052,
+							ReadOnly: true,
+						},
+						LogLevel: "trace",
+					},
+				},
+			},
+			expectedData:  readTestData(t, "remotesapi_event_scheduler.yaml"),
+			expectedError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -424,6 +453,24 @@ func TestConfigMCPServerOmitEmpty(t *testing.T) {
 	}
 	if !strings.Contains(string(yamlDataWithMCP), "mcp_server:") {
 		t.Error("config with MCPServer set should contain 'mcp_server:' in YAML output")
+	}
+}
+
+func TestConfigRemotesAPIAndEventSchedulerOmitEmpty(t *testing.T) {
+	config := Config{
+		Behavior: Behavior{AutoGCBehavior: AutoGCBehavior{Enable: false}},
+		LogLevel: "trace",
+		Listener: Listener{Host: "0.0.0.0", Port: 3306, MaxConnections: 128},
+	}
+	yamlData, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatalf("unexpected error marshaling config: %v", err)
+	}
+	if strings.Contains(string(yamlData), "remotesapi:") {
+		t.Error("config with nil RemotesAPI should not contain 'remotesapi:' in YAML output")
+	}
+	if strings.Contains(string(yamlData), "event_scheduler:") {
+		t.Error("config without an event scheduler setting should not contain 'event_scheduler:' in YAML output")
 	}
 }
 

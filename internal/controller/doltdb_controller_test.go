@@ -77,8 +77,9 @@ var _ = Describe("DoltDB Controller", func() {
 			g.Expect(headlessService.Spec.ClusterIP).To(Equal("None"))
 			g.Expect(headlessService.Spec.Selector).To(HaveKeyWithValue("app.kubernetes.io/name", testDoltDB.Name))
 
-			// Verify ports
+			// Verify ports. The user-facing RemotesAPI port is not exposed on the headless Service.
 			g.Expect(headlessService.Spec.Ports).To(HaveLen(2))
+			g.Expect(findServicePort(headlessService.Spec.Ports, builder.DoltUserRemotesAPIPortName)).To(BeNil())
 
 			// Check MySQL port
 			mysqlPort := findServicePort(headlessService.Spec.Ports, builder.DoltMySQLPortName)
@@ -109,13 +110,18 @@ var _ = Describe("DoltDB Controller", func() {
 			g.Expect(primaryService.Spec.Selector).To(HaveKeyWithValue("app.kubernetes.io/name", testDoltDB.Name))
 
 			// Verify ports
-			g.Expect(primaryService.Spec.Ports).To(HaveLen(1))
+			g.Expect(primaryService.Spec.Ports).To(HaveLen(2))
 
 			// Check MySQL port
 			mysqlPort := findServicePort(primaryService.Spec.Ports, builder.DoltMySQLPortName)
 			g.Expect(mysqlPort).NotTo(BeNil())
 			g.Expect(mysqlPort.Port).To(Equal(testDoltDB.Spec.Server.Listener.Port))
 			g.Expect(mysqlPort.Name).To(Equal(builder.DoltMySQLPortName))
+
+			// Check user-facing RemotesAPI port, defaulted by the CRD
+			userRemotesAPIPort := findServicePort(primaryService.Spec.Ports, builder.DoltUserRemotesAPIPortName)
+			g.Expect(userRemotesAPIPort).NotTo(BeNil())
+			g.Expect(userRemotesAPIPort.Port).To(Equal(int32(50052)))
 
 			return true
 		}, testTimeout, testInterval).Should(BeTrue())
@@ -134,8 +140,9 @@ var _ = Describe("DoltDB Controller", func() {
 			g.Expect(readerService.Spec.Selector).To(HaveKeyWithValue(dolt.RoleLabel, dolt.StandbyRoleValue.String()))
 			g.Expect(readerService.Spec.Selector).To(HaveKeyWithValue("app.kubernetes.io/name", testDoltDB.Name))
 
-			// Verify ports
+			// Verify ports. The user-facing RemotesAPI port is not exposed on standbys.
 			g.Expect(readerService.Spec.Ports).To(HaveLen(1))
+			g.Expect(findServicePort(readerService.Spec.Ports, builder.DoltUserRemotesAPIPortName)).To(BeNil())
 
 			// Check MySQL port
 			mysqlPort := findServicePort(readerService.Spec.Ports, builder.DoltMySQLPortName)
