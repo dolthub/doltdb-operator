@@ -77,6 +77,10 @@ func (b *Builder) BuildDoltStatefulSet(
 // based on the DoltDB UpdateStrategy setting.
 // This follows the same pattern as the MariaDB operator.
 func doltStatefulSetUpdateStrategy(doltdb *doltv1alpha.DoltDB) appsv1.StatefulSetUpdateStrategy {
+	if doltdb.Spec.UpdateStrategy == doltv1alpha.RollingUpdateUpdateType && doltdb.IsManualFailoverReplication() {
+		// Legacy pods may carry a demoting preStop; the operator must order deletions.
+		return appsv1.StatefulSetUpdateStrategy{Type: appsv1.OnDeleteStatefulSetStrategyType}
+	}
 	switch doltdb.Spec.UpdateStrategy {
 	case doltv1alpha.ReplicasFirstPrimaryLastUpdateType, "":
 		// Operator manages pod deletions (replicas first, then primary)

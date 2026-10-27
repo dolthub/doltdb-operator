@@ -134,17 +134,21 @@ func (r *ReplicationConfig) GetNextPrimary(
 	return nextPrimary, nil
 }
 
+// GetDBStates reads the replication state of every pod, returning one entry per replica in pod-index order.
+// It never fails as a whole: a pod whose state cannot be read gets its error in the corresponding
+// dolt.DBState.Err instead, so callers can tell "unknown" apart from a genuinely empty state.
 func GetDBStates(ctx context.Context, doltdb *doltv1alpha.DoltDB, clientSet *ReplicationClientSet) []dolt.DBState {
 	ret := make([]dolt.DBState, doltdb.Spec.Replicas)
 	for i := 0; i < int(doltdb.Spec.Replicas); i++ {
 		client, err := clientSet.ClientForIndex(ctx, i)
 		if err != nil {
+			ret[i].Err = err
 			continue
 		}
 		ret[i], err = client.GetDBState(ctx)
 		if err != nil {
+			ret[i].Err = err
 			log.FromContext(ctx).V(1).Error(err, "error getting DB state, skipping", "pod", statefulset.PodName(doltdb.ObjectMeta, i))
-			continue
 		}
 	}
 	return ret

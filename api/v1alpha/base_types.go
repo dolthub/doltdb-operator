@@ -60,6 +60,8 @@ const (
 
 	// RollingUpdateUpdateType uses Kubernetes native rolling update strategy.
 	// Pods are updated in reverse ordinal order (highest to lowest).
+	// With replication enabled and automatic failover disabled, the operator instead uses
+	// OnDelete and restarts standbys first, then the primary in place.
 	RollingUpdateUpdateType UpdateType = "RollingUpdate"
 
 	// OnDeleteUpdateType requires manual deletion of pods to trigger updates.

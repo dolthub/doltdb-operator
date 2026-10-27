@@ -133,10 +133,19 @@ func (r *ReplicationReconciler) Reconcile(ctx context.Context, doltdb *doltv1alp
 		key:       client.ObjectKeyFromObject(doltdb),
 		clientSet: clientSet,
 	}
+
+	reassertResult, err := r.reconcilePrimaryReassert(ctx, &req, logger)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	if result, err := r.reconcileReplication(ctx, &req, logger); !result.IsZero() || err != nil {
 		return result, err
 	}
-	return ctrl.Result{}, r.reconcileSwitchover(ctx, &req, switchoverLogger)
+	if err := r.reconcileSwitchover(ctx, &req, switchoverLogger); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return reassertResult, nil
 }
 
 func (r *ReplicationReconciler) reconcileReplication(ctx context.Context, req *reconcileRequest, logger logr.Logger) (ctrl.Result, error) {

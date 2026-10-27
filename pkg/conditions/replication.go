@@ -38,6 +38,26 @@ func SetPrimarySwitched(c Conditioner) {
 	})
 }
 
+// SetPrimaryAvailable sets the condition indicating that a pod reports the primary role.
+func SetPrimaryAvailable(c Conditioner) {
+	c.SetCondition(metav1.Condition{
+		Type:    doltv1alpha.ConditionTypePrimaryAvailable,
+		Status:  metav1.ConditionTrue,
+		Reason:  doltv1alpha.ConditionReasonPrimaryAvailable,
+		Message: "A pod reports role primary",
+	})
+}
+
+// SetNoPrimary sets the condition indicating that no safe primary is available.
+func SetNoPrimary(c Conditioner, message string) {
+	c.SetCondition(metav1.Condition{
+		Type:    doltv1alpha.ConditionTypePrimaryAvailable,
+		Status:  metav1.ConditionFalse,
+		Reason:  doltv1alpha.ConditionReasonNoPrimary,
+		Message: message,
+	})
+}
+
 // switchingPrimaryMessage generates a message indicating the target primary pod during a switch.
 func switchingPrimaryMessage(doltdb *doltv1alpha.DoltDB) string {
 	return fmt.Sprintf(

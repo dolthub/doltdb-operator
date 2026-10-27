@@ -8,6 +8,7 @@ import (
 
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	"github.com/electronicarts/doltdb-operator/pkg/dolt"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -259,6 +260,56 @@ func TestDoltVolumeClaimTemplatesWithVolumeSnapshot(t *testing.T) {
 			gotDataSource := pvcs[0].Spec.DataSource
 			if !reflect.DeepEqual(gotDataSource, tt.wantDataSource) {
 				t.Errorf("unexpected DataSource, want: %v, got: %v", tt.wantDataSource, gotDataSource)
+			}
+		})
+	}
+}
+
+func TestDoltStatefulSetUpdateStrategy(t *testing.T) {
+	tests := []struct {
+		name         string
+		doltdb       *doltv1alpha.DoltDB
+		wantStrategy appsv1.StatefulSetUpdateStrategyType
+	}{
+		{
+			name: "manual failover uses operator-managed OnDelete updates",
+			doltdb: &doltv1alpha.DoltDB{Spec: doltv1alpha.DoltDBSpec{
+				UpdateStrategy: doltv1alpha.RollingUpdateUpdateType,
+				Replication: &doltv1alpha.Replication{
+					Enabled: true,
+					ReplicationSpec: doltv1alpha.ReplicationSpec{
+						Primary: &doltv1alpha.PrimaryReplication{AutomaticFailover: ptr.To(false)},
+					},
+				},
+			}},
+			wantStrategy: appsv1.OnDeleteStatefulSetStrategyType,
+		},
+		{
+			name: "automatic failover keeps Kubernetes RollingUpdate",
+			doltdb: &doltv1alpha.DoltDB{Spec: doltv1alpha.DoltDBSpec{
+				UpdateStrategy: doltv1alpha.RollingUpdateUpdateType,
+				Replication: &doltv1alpha.Replication{
+					Enabled: true,
+					ReplicationSpec: doltv1alpha.ReplicationSpec{
+						Primary: &doltv1alpha.PrimaryReplication{AutomaticFailover: ptr.To(true)},
+					},
+				},
+			}},
+			wantStrategy: appsv1.RollingUpdateStatefulSetStrategyType,
+		},
+		{
+			name: "disabled replication keeps Kubernetes RollingUpdate",
+			doltdb: &doltv1alpha.DoltDB{Spec: doltv1alpha.DoltDBSpec{
+				UpdateStrategy: doltv1alpha.RollingUpdateUpdateType,
+			}},
+			wantStrategy: appsv1.RollingUpdateStatefulSetStrategyType,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := doltStatefulSetUpdateStrategy(tt.doltdb).Type; got != tt.wantStrategy {
+				t.Errorf("doltStatefulSetUpdateStrategy() = %v, want %v", got, tt.wantStrategy)
 			}
 		})
 	}

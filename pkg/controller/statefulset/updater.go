@@ -38,10 +38,10 @@ func shouldReconcileUpdates(doltdb *doltv1alpha.DoltDB) bool {
 	if doltdb.IsResizingStorage() || doltdb.IsSwitchingPrimary() {
 		return false
 	}
-	// Only automatically reconcile updates for ReplicasFirstPrimaryLast strategy
-	// - RollingUpdate: Kubernetes handles updates natively (no operator intervention)
-	// - OnDelete: User must manually delete pods to trigger updates
-	// - Never: No automatic updates at all
+	// Manual-failover RollingUpdates need operator ordering to protect legacy pod hooks.
+	if doltdb.Spec.UpdateStrategy == doltv1alpha.RollingUpdateUpdateType && doltdb.IsManualFailoverReplication() {
+		return true
+	}
 	return doltdb.Spec.UpdateStrategy == "" ||
 		doltdb.Spec.UpdateStrategy == doltv1alpha.ReplicasFirstPrimaryLastUpdateType
 }
@@ -75,6 +75,12 @@ func (r *Reconciler) reconcileUpdates(ctx context.Context, doltdb *doltv1alpha.D
 
 	if result, err := r.waitForReadyStatus(ctx, doltdb, logger); !result.IsZero() || err != nil {
 		return result, err
+	}
+	if doltdb.IsManualFailoverReplication() {
+		// Pod classification comes from status; never delete a pod that Dolt still reports as primary.
+		if result, err := r.waitForRolesMatchingStatus(ctx, doltdb, logger); !result.IsZero() || err != nil {
+			return result, err
+		}
 	}
 
 	for _, replicaPod := range podsByRole.replicas {
@@ -118,6 +124,53 @@ func (r *Reconciler) waitForReadyStatus(ctx context.Context, doltdb *doltv1alpha
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// waitForRolesMatchingStatus defers updates until every pod's Dolt role agrees with status.currentPrimaryPodIndex.
+func (r *Reconciler) waitForRolesMatchingStatus(
+	ctx context.Context,
+	doltdb *doltv1alpha.DoltDB,
+	logger logr.Logger,
+) (ctrl.Result, error) {
+	roles := make([]string, doltdb.Spec.Replicas)
+	for i := range roles {
+		podClient, err := doltsql.NewInternalClientWithPodIndex(ctx, doltdb, r.refResolver, i)
+		if err != nil {
+			logger.Info("Unable to read Dolt role; deferring update", "pod-index", i, "error", err)
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		role, _, err := podClient.GetRoleAndEpoch(ctx)
+		_ = podClient.Close()
+		if err != nil {
+			logger.Info("Unable to read Dolt role; deferring update", "pod-index", i, "error", err)
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		roles[i] = role
+	}
+	if mismatch := roleStatusMismatch(roles, ptr.Deref(doltdb.Status.CurrentPrimaryPodIndex, -1)); mismatch != "" {
+		logger.Info("Dolt roles disagree with status; deferring update", "reason", mismatch)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// roleStatusMismatch returns why the reported roles disagree with the recorded primary, or "" when they agree.
+func roleStatusMismatch(roles []string, primaryIndex int) string {
+	if primaryIndex < 0 || primaryIndex >= len(roles) {
+		return "status.currentPrimaryPodIndex is not set to a valid pod"
+	}
+	for i, role := range roles {
+		want := dolt.StandbyRoleValue.String()
+		if i == primaryIndex {
+			want = dolt.PrimaryRoleValue.String()
+		}
+		if role != want {
+			return fmt.Sprintf("pod index %d reports role %q, want %q", i, role, want)
+		}
+	}
+
+	return ""
 }
 
 // waitForReplicationCaughtUp checks that replication is configured and that standbys
@@ -198,9 +251,9 @@ func (r *Reconciler) waitForReplicationCaughtUp(
 	return ctrl.Result{}, nil
 }
 
-// gracefulPrimaryUpdate performs a graceful switchover before deleting the primary pod.
-// It transitions the primary to standby (draining replication), promotes a standby,
-// updates pod labels, and then deletes the (now standby) pod for update.
+// gracefulPrimaryUpdate prepares a primary Pod for an update.
+// Manual-failover clusters restart it in place; automatic-failover clusters transition it to standby
+// and promote a caught-up standby before deletion.
 func (r *Reconciler) gracefulPrimaryUpdate(
 	ctx context.Context,
 	doltdb *doltv1alpha.DoltDB,
@@ -209,6 +262,10 @@ func (r *Reconciler) gracefulPrimaryUpdate(
 	updateRevision string,
 	logger logr.Logger,
 ) error {
+	if doltdb.IsManualFailoverReplication() {
+		logger.Info("Automatic failover disabled; updating primary in place", "pod", primaryPod.Name)
+		return r.updatePod(ctx, doltdbKey, primaryPod, updateRevision, logger)
+	}
 	if !doltdb.Replication().Enabled || doltdb.Status.CurrentPrimaryPodIndex == nil {
 		return r.updatePod(ctx, doltdbKey, primaryPod, updateRevision, logger)
 	}

@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	ConditionTypeReady           string = "Ready"
-	ConditionTypePrimarySwitched string = "PrimarySwitched"
-	ConditionTypeComplete        string = "Complete"
+	ConditionTypeReady            string = "Ready"
+	ConditionTypePrimarySwitched  string = "PrimarySwitched"
+	ConditionTypePrimaryAvailable string = "PrimaryAvailable"
+	ConditionTypeComplete         string = "Complete"
 	// ConditionTypeStorageResized indicates that the storage has been successfully resized.
 	ConditionTypeStorageResized string = "StorageResized"
 	// ConditionTypeUpdated indicates that an update has been successfully completed.
@@ -37,6 +38,8 @@ const (
 	ConditionReasonUpdating            string = "Updating"
 	ConditionReasonUpdated             string = "Updated"
 
+	ConditionReasonNoPrimary        string = "NoPrimary"
+	ConditionReasonPrimaryAvailable string = "PrimaryAvailable"
 	ConditionReasonConnectionFailed string = "ConnectionFailed"
 
 	ConditionReasonCreated     string = "Created"

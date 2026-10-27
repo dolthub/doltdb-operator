@@ -25,6 +25,10 @@ const (
 	ReasonPrimarySwitching = "PrimarySwitching"
 	// ReasonPrimarySwitched indicates that primary has been switched.
 	ReasonPrimarySwitched = "PrimarySwitched"
+	// ReasonNoPrimary indicates that no safe primary is currently available.
+	ReasonNoPrimary = "NoPrimary"
+	// ReasonPrimaryReasserted indicates that the recorded primary was restored after demotion.
+	ReasonPrimaryReasserted = "PrimaryReasserted"
 	// ReasonCRDNotFound indicates that a third party CRD is not present in the cluster.
 	ReasonCRDNotFound = "CRDNotFound"
 
