@@ -230,6 +230,47 @@ var _ = Describe("DoltDB primary termination with automatic failover disabled", 
 		expectPrimaryWritable(doltdb, 1)
 	})
 
+	It("rolls out a cluster that has no user databases", func() {
+		name := fmt.Sprintf("dolt-manual-failover-empty-%d", time.Now().UnixNano())
+		doltdbKey := types.NamespacedName{Name: name, Namespace: "default"}
+		doltdb := createReplicationCluster(name, doltv1alpha.RollingUpdateUpdateType, false)
+		waitForManualFailoverCluster(doltdbKey, doltdb)
+
+		By("confirming the cluster has nothing to replicate")
+		// Deliberately no expectPrimaryWritable here. Before its first user database a cluster reports
+		// no dolt_cluster_status rows at all, which the replication catch-up gate used to read as
+		// "a standby has not connected yet" and wait on forever.
+		Eventually(func() string {
+			return manualFailoverRoleMismatch(doltdb, 0, -1)
+		}, testHighTimeout, testInterval).Should(BeEmpty())
+		Expect(userDatabases(doltdb, 0)).To(BeEmpty())
+
+		statefulSet := waitForStatefulSetObserved(doltdbKey)
+		Expect(statefulSet.Spec.UpdateStrategy.Type).To(Equal(appsv1.OnDeleteStatefulSetStrategyType))
+
+		By("changing a pod-template annotation to trigger operator-managed rollout")
+		Eventually(func() error {
+			if err := k8sClient.Get(ctx, doltdbKey, doltdb); err != nil {
+				return err
+			}
+			doltdb.Spec.PodAnnotations = map[string]string{"rollout-trigger": "changed"}
+			return k8sClient.Update(ctx, doltdb)
+		}, testHighTimeout, testInterval).Should(Succeed())
+
+		pods := waitForOperatorRollout(doltdbKey, doltdb, statefulSet.Status.UpdateRevision)
+		for i := range pods {
+			Expect(pods[i].Annotations).To(HaveKeyWithValue("rollout-trigger", "changed"))
+		}
+		expectStandbysRestartedBeforePrimary(pods, 0)
+
+		By("keeping pod index 0 primary and writable after the rollout")
+		waitForPinnedPrimaryStatus(doltdbKey, 0)
+		Eventually(func() string {
+			return manualFailoverRoleMismatch(doltdb, 0, -1)
+		}, testHighTimeout, testInterval).Should(BeEmpty())
+		expectPrimaryWritable(doltdb, 0)
+	})
+
 	It("recovers the pinned primary when an upgrade rolls out pods that still carry the legacy preStop hook", func() {
 		name := fmt.Sprintf("dolt-legacy-hook-upgrade-%d", time.Now().UnixNano())
 		doltdbKey := types.NamespacedName{Name: name, Namespace: "default"}
@@ -644,6 +685,16 @@ func expectWritableRowCount(doltdb *doltv1alpha.DoltDB, podIndex int, databaseNa
 	var got int
 	Expect(podClient.QueryRow(ctx, "SELECT COUNT(*) FROM writable").Scan(&got)).To(Succeed())
 	Expect(got).To(Equal(want))
+}
+
+// userDatabases returns the pod's user databases, excluding Dolt's system databases.
+func userDatabases(doltdb *doltv1alpha.DoltDB, podIndex int) []string {
+	podClient, err := sql.NewInternalClientWithPodIndex(ctx, doltdb, refResolver, podIndex)
+	Expect(err).NotTo(HaveOccurred())
+	databases, err := podClient.ListDatabases(ctx)
+	Expect(podClient.Close()).To(Succeed())
+	Expect(err).NotTo(HaveOccurred())
+	return databases
 }
 
 // insertWritableRow commits one more row into an already-replicated database on the primary.

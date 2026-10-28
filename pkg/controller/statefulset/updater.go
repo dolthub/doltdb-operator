@@ -221,8 +221,21 @@ func (r *Reconciler) waitForReplicationCaughtUp(
 		return ctrl.Result{}, nil
 	}
 
-	// If the primary reports no standby statuses, the standby hasn't connected yet.
+	// The primary reports one status row per replicated database, so an empty result is ambiguous:
+	// either no standby has connected yet, or there is nothing to replicate at all. A cluster with no
+	// user databases would otherwise block here forever, since no status row can ever appear.
 	if len(statuses) == 0 {
+		databases, err := primaryClient.ListDatabases(ctx)
+		if err != nil {
+			// Fail closed: without the database list this cannot tell "nothing to replicate" apart
+			// from "a standby is behind", and proceeding would delete the primary either way.
+			logger.V(1).Info("Unable to list databases; deferring update", "error", err)
+			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+		}
+		if len(databases) == 0 {
+			logger.V(0).Info("No user databases to replicate, skipping replication catch-up check")
+			return ctrl.Result{}, nil
+		}
 		logger.V(0).Info("No replication statuses reported by primary, standby may still be connecting")
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
