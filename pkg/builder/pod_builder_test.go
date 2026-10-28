@@ -390,6 +390,22 @@ func TestDoltLifecycle(t *testing.T) {
 			wantPort: 3306,
 		},
 		{
+			name: "automatic failover disabled excludes demotion lifecycle",
+			doltdb: &doltv1alpha.DoltDB{
+				Spec: doltv1alpha.DoltDBSpec{
+					Replication: &doltv1alpha.Replication{
+						Enabled: true,
+						ReplicationSpec: doltv1alpha.ReplicationSpec{
+							Primary: &doltv1alpha.PrimaryReplication{
+								AutomaticFailover: ptr.To(false),
+							},
+						},
+					},
+				},
+			},
+			wantNil: true,
+		},
+		{
 			name: "replication disabled excludes lifecycle",
 			doltdb: &doltv1alpha.DoltDB{
 				Spec: doltv1alpha.DoltDBSpec{

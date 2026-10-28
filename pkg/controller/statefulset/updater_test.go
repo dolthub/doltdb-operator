@@ -8,6 +8,7 @@ import (
 	doltv1alpha "github.com/electronicarts/doltdb-operator/api/v1alpha"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestShouldReconcileUpdates(t *testing.T) {
@@ -39,6 +40,50 @@ func TestShouldReconcileUpdates(t *testing.T) {
 			doltdb: &doltv1alpha.DoltDB{
 				Spec: doltv1alpha.DoltDBSpec{
 					UpdateStrategy: doltv1alpha.RollingUpdateUpdateType,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "RollingUpdate with manual failover reconciles updates",
+			doltdb: &doltv1alpha.DoltDB{
+				Spec: doltv1alpha.DoltDBSpec{
+					UpdateStrategy: doltv1alpha.RollingUpdateUpdateType,
+					Replication: &doltv1alpha.Replication{
+						Enabled: true,
+						ReplicationSpec: doltv1alpha.ReplicationSpec{
+							Primary: &doltv1alpha.PrimaryReplication{AutomaticFailover: ptr.To(false)},
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "RollingUpdate with automatic failover remains Kubernetes-managed",
+			doltdb: &doltv1alpha.DoltDB{
+				Spec: doltv1alpha.DoltDBSpec{
+					UpdateStrategy: doltv1alpha.RollingUpdateUpdateType,
+					Replication: &doltv1alpha.Replication{
+						Enabled: true,
+						ReplicationSpec: doltv1alpha.ReplicationSpec{
+							Primary: &doltv1alpha.PrimaryReplication{AutomaticFailover: ptr.To(true)},
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "RollingUpdate with replication disabled remains Kubernetes-managed",
+			doltdb: &doltv1alpha.DoltDB{
+				Spec: doltv1alpha.DoltDBSpec{
+					UpdateStrategy: doltv1alpha.RollingUpdateUpdateType,
+					Replication: &doltv1alpha.Replication{
+						ReplicationSpec: doltv1alpha.ReplicationSpec{
+							Primary: &doltv1alpha.PrimaryReplication{AutomaticFailover: ptr.To(false)},
+						},
+					},
 				},
 			},
 			want: false,
@@ -212,6 +257,47 @@ func TestGetPodsByRoleSingleInstance(t *testing.T) {
 			if hasReplicaRequirement == tt.expectNoReplica {
 				t.Errorf("Replicas=%d: hasReplicaRequirement=%v, expectNoReplica=%v",
 					tt.replicas, hasReplicaRequirement, tt.expectNoReplica)
+			}
+		})
+	}
+}
+
+func TestRoleStatusMismatch(t *testing.T) {
+	tests := []struct {
+		name         string
+		roles        []string
+		primaryIndex int
+		want         string
+	}{
+		{
+			name:         "roles agree with recorded primary",
+			roles:        []string{"standby", "primary", "standby"},
+			primaryIndex: 1,
+		},
+		{
+			name:         "bootstrap primary differs from recorded primary",
+			roles:        []string{"primary", "standby", "standby"},
+			primaryIndex: 1,
+			want:         `pod index 0 reports role "primary", want "standby"`,
+		},
+		{
+			name:         "recorded primary was demoted",
+			roles:        []string{"standby", "standby"},
+			primaryIndex: 1,
+			want:         `pod index 1 reports role "standby", want "primary"`,
+		},
+		{
+			name:         "recorded primary index is unset",
+			roles:        []string{"primary", "standby"},
+			primaryIndex: -1,
+			want:         "status.currentPrimaryPodIndex is not set to a valid pod",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := roleStatusMismatch(tt.roles, tt.primaryIndex); got != tt.want {
+				t.Errorf("roleStatusMismatch() = %q, want %q", got, tt.want)
 			}
 		})
 	}

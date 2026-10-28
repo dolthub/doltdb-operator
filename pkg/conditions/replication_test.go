@@ -107,3 +107,50 @@ func TestSetPrimarySwitched(t *testing.T) {
 		})
 	}
 }
+
+func TestPrimaryAvailabilityConditions(t *testing.T) {
+	message := "all pods are standby; candidate epoch is not unique"
+	tests := []struct {
+		name     string
+		set      func(Conditioner)
+		expected metav1.Condition
+	}{
+		{
+			name: "primary available",
+			set:  SetPrimaryAvailable,
+			expected: metav1.Condition{
+				Type:    doltv1alpha.ConditionTypePrimaryAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  doltv1alpha.ConditionReasonPrimaryAvailable,
+				Message: "A pod reports role primary",
+			},
+		},
+		{
+			name: "no safe primary",
+			set: func(c Conditioner) {
+				SetNoPrimary(c, message)
+			},
+			expected: metav1.Condition{
+				Type:    doltv1alpha.ConditionTypePrimaryAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  doltv1alpha.ConditionReasonNoPrimary,
+				Message: message,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &MockConditioner{}
+			tt.set(mock)
+			if len(mock.conditions) != 1 {
+				t.Fatalf("expected 1 condition, got %d", len(mock.conditions))
+			}
+			condition := mock.conditions[0]
+			if condition.Type != tt.expected.Type || condition.Status != tt.expected.Status ||
+				condition.Reason != tt.expected.Reason || condition.Message != tt.expected.Message {
+				t.Errorf("unexpected condition: %+v", condition)
+			}
+		})
+	}
+}

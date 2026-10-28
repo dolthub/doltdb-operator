@@ -210,7 +210,7 @@ The operator does NOT implement application-level TLS. It assumes network-level 
 
 ### Debugging Replication
 - Check `doltdb.Status.CurrentPrimaryPodIndex` for current primary
-- Check conditions: `PrimarySwitching`, `PrimaryConfigured`, `Ready`
+- Check conditions: `PrimarySwitched`, `PrimaryAvailable`, `Ready`
 - Replication logic is in `pkg/controller/replication/`:
   - `controller.go` — main replication reconciler
   - `pod_readiness.go` — automatic failover on pod failure

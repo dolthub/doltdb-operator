@@ -80,6 +80,12 @@ func (d *DoltDB) Replication() Replication {
 	return *d.Spec.Replication
 }
 
+// IsManualFailoverReplication reports whether replication is enabled without automatic failover.
+func (d *DoltDB) IsManualFailoverReplication() bool {
+	replication := d.Replication()
+	return replication.Enabled && !*replication.Primary.AutomaticFailover
+}
+
 type ReplicationState string
 
 const (

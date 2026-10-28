@@ -78,7 +78,8 @@ type DoltDBSpec struct {
 	// UpdateStrategy defines how the operator should handle pod updates when the DoltDB spec changes.
 	// Valid values are:
 	//  - ReplicasFirstPrimaryLast (default): Automatically updates pods, replicas first then primary
-	//  - RollingUpdate: Uses Kubernetes native rolling update (highest to lowest ordinal)
+	//  - RollingUpdate: Uses Kubernetes native rolling update (highest to lowest ordinal). With replication enabled and
+	//    automaticFailover: false, the operator uses OnDelete and restarts standbys first, then the primary in place.
 	//  - OnDelete: Pods are only updated when manually deleted
 	//  - Never: Pods are never automatically updated, ConfigMap changes won't trigger restarts
 	// +kubebuilder:validation:Enum=ReplicasFirstPrimaryLast;RollingUpdate;OnDelete;Never
