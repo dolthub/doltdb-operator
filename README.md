@@ -161,6 +161,66 @@ make cluster        # Create a kind cluster
 make tiltci         # Run integration tests
 ```
 
+### Local Tilt Development
+
+Local development requires Go 1.23.x (for `controller-gen` v0.16.1), Docker, kubectl, Kind 0.32 or newer, and Tilt.
+
+```sh
+make local-dev-up    # Create/reuse the cluster and start Tilt in this terminal
+```
+
+Press Ctrl+C in the Tilt terminal to stop Tilt; the cluster and workloads remain. To delete them:
+
+```sh
+make local-dev-down  # Delete the local cluster and its data
+```
+
+The workflow uses a dedicated `doltdb-local` Kind cluster (Kubernetes 1.36.1) with two nodes:
+
+- One Kubernetes control-plane node.
+- One worker; `make local-dev-up` labels it `node-role.kubernetes.io/worker` after registration. The operator and DoltDB pods (and Istio, when enabled) run on it.
+
+The operator runs two replicas with leader election. The local DoltDB cluster runs two replicas with automatic replication and failover. Its manifest omits `replication.primary.podIndex`, so a Tilt reapply keeps the primary the operator selected after a failover. Both database pods share the worker, so this exercises pod-level failover but not node loss.
+
+The two DoltDB containers request 3 CPU and 4GiB of memory in total; their memory limits allow up to 8GiB combined. This excludes Istio sidecars, the operator, and Kubernetes components. Allocate additional CPU and memory to Docker/Kind or pods may remain Pending.
+
+Istio is disabled by default. To enable it, put `istioctl` on `PATH` and run:
+
+```sh
+make local-dev-up ISTIO_ENABLED=true
+```
+
+This installs the Istio minimal profile and enables automatic sidecar injection for the local operator and DoltDB pods. Choose an `istioctl` version compatible with Kubernetes 1.36.1. The workflow does not set a strict mTLS policy. Disabling Istio later does not uninstall it or remove the injection labels; run `make local-dev-down` to start from a clean cluster.
+
+The operator is built from this checkout by default. Setting `LOCAL_DEV_OPERATOR_IMAGE` skips the local build and produces a Tilt warning. For a custom local image, build it and load it into the cluster first; skip `kind create cluster` if `doltdb-local` already exists:
+
+```sh
+export LOCAL_DEV_OPERATOR_IMAGE=localhost:5000/doltdb-operator:dev
+docker build -t "$LOCAL_DEV_OPERATOR_IMAGE" .
+mkdir -p .local
+kind create cluster --name doltdb-local --config hack/manifests/kind/kind-local-dev.yaml --kubeconfig .local/kubeconfig
+kind load docker-image "$LOCAL_DEV_OPERATOR_IMAGE" --name doltdb-local
+make local-dev-up
+```
+
+For a registry image, use a pullable immutable digest such as `registry.example/doltdb-operator@sha256:…`.
+
+The local DoltDB manifest sets Dolt engine `2.4.1`. To override it, set `LOCAL_DEV_DOLTDB_ENGINE_VERSION` to a published tag compatible with the existing database data:
+
+```sh
+make local-dev-up LOCAL_DEV_DOLTDB_ENGINE_VERSION=<tag>
+```
+
+To access the cluster from another terminal, merge the isolated kubeconfig into `kubectl`'s configuration for that shell:
+
+```sh
+export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}:$PWD/.local/kubeconfig"
+kubectl config get-contexts
+kubectl --context kind-doltdb-local get pods -A
+```
+
+This merged setting applies only to this shell and does not edit `~/.kube/config`. Pass `--context kind-doltdb-local` to commands that should target the local cluster.
+
 ## License
 
 [BSD 3-Clause License](LICENSE.txt) - Copyright (c) 2025 Electronic Arts Inc.

@@ -1,0 +1,36 @@
+apiVersion: k8s.dolthub.com/v1alpha
+kind: DoltDB
+metadata:
+  name: dolt
+  namespace: default
+spec:
+  engineVersion: 2.4.1
+  image: dolthub/dolt
+  replicas: 2
+  # Reduced local resource requests let both replicas fit on the single worker.
+  resources:
+    requests:
+      cpu: 1500m
+      memory: 2Gi
+    limits:
+      memory: 4Gi
+  storage:
+    size: 5Gi
+  server:
+    behavior:
+      autoGCBehavior:
+        enabled: true
+    cluster:
+      remotesAPI:
+        port: 50051
+    logLevel: warning
+    listener:
+      host: 0.0.0.0
+      port: 3306
+  globalConfig:
+    disableClientUsageMetricsCollection: true
+    commitAuthor:
+      name: dolt kubernetes deployment
+      email: dolt@kubernetes.deployment
+  replication:
+    enabled: true

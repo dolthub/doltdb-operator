@@ -17,7 +17,8 @@ make test TESTFLAGS="-run TestSpecificTest"  # Run a specific test
 # Integration tests (requires kind cluster, runs in-cluster via Tilt)
 make cluster cluster-ctx      # Create and switch to kind cluster
 make tiltci                   # CI mode - runs tests and exits (preferred for AI)
-make tiltdev                  # Interactive mode with Tilt UI
+make local-dev-up             # Interactive local dev workflow (isolated Kind cluster)
+make local-dev-down           # Delete the dedicated local-dev cluster
 
 # Lint
 make lint                     # Run golangci-lint + golines (check only)
@@ -143,7 +144,7 @@ dbState, err := client.GetDBState(ctx)
 - Test files live alongside source (`*_test.go`)
 
 ### Integration Tests
-- Run with `make tiltci` (CI) or `make tiltdev` (interactive)
+- Run integration tests with `make tiltci` (CI). Use `make local-dev-up` for interactive local development.
 - Located in `internal/controller/` using Ginkgo/Gomega
 - Require a kind cluster with `DOLTDB_ENGINE_VERSION` env var set
 - Test runner deployed as a Kubernetes Job via `Dockerfile.dev`
